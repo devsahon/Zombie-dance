@@ -1,0 +1,108 @@
+{
+  "timestamp": "2026-02-15T15:06:55.932Z",
+  "model": "llama3.1:latest",
+  "agents": [
+    {
+      "id": 1,
+      "name": "Code Editor Agent (ZombieCoder Dev Agent)",
+      "persona": "ZombieCoder Dev Agent",
+      "iterations": [
+        {
+          "success": true,
+          "response": "ভাইয়া, I am ZombieCoder Dev Agent.",
+          "latency": 29015,
+          "iteration": 1
+        },
+        {
+          "success": true,
+          "response": "Bhāiya, I'm here to help. What's your first question?",
+          "latency": 2875,
+          "iteration": 2
+        },
+        {
+          "success": true,
+          "response": "ভাইয়া, আমি ZombieCoder Dev Agent।",
+          "latency": 2838,
+          "iteration": 3
+        }
+      ],
+      "stats": {
+        "avgLatency": 11576,
+        "minLatency": 2838,
+        "maxLatency": 29015,
+        "totalTime": 34728,
+        "successCount": 3
+      }
+    },
+    {
+      "id": 2,
+      "name": "Master Orchestrator",
+      "persona": "System Master",
+      "iterations": [
+        {
+          "success": true,
+          "response": "I am Master Orchestrator of the ZombieCoder System.",
+          "latency": 18069,
+          "iteration": 1
+        },
+        {
+          "success": true,
+          "response": "I asked you to provide me with the details of the ZombieCoder System.",
+          "latency": 2996,
+          "iteration": 2
+        },
+        {
+          "success": true,
+          "response": "My name is Master Orchestrator of the ZombieCoder System.",
+          "latency": 2657,
+          "iteration": 3
+        }
+      ],
+      "stats": {
+        "avgLatency": 7907,
+        "minLatency": 2657,
+        "maxLatency": 18069,
+        "totalTime": 23722,
+        "successCount": 3
+      }
+    },
+    {
+      "id": 3,
+      "name": "Chat Assistant",
+      "persona": "Friendly Assistant",
+      "iterations": [
+        {
+          "success": true,
+          "response": "I am ZombieCoder.",
+          "latency": 8215,
+          "iteration": 1
+        },
+        {
+          "success": true,
+          "response": "Sure! What did you ask?",
+          "latency": 2092,
+          "iteration": 2
+        },
+        {
+          "success": true,
+          "response": "Your name is Sahon Srabon.",
+          "latency": 1759,
+          "iteration": 3
+        }
+      ],
+      "stats": {
+        "avgLatency": 4022,
+        "minLatency": 1759,
+        "maxLatency": 8215,
+        "totalTime": 12066,
+        "successCount": 3
+      }
+    }
+  ],
+  "summary": {
+    "totalTests": 9,
+    "totalLatency": 70516,
+    "avgLatency": 7835,
+    "agentsResponding": 3
+  }
+}

@@ -42,6 +42,7 @@ interface AgentConfig {
         };
         system_instructions?: string;
     };
+    metadata?: Record<string, any>;
 }
 
 interface SessionMetadata {
@@ -153,11 +154,45 @@ You are ${agentConfig.name}, a ${agentConfig.type} agent.`;
         parts.push(`Owner: ${owner}`);
         parts.push('');
         
+        // ===== AGENT PERSONA =====
+        if (agentConfig.system_prompt) {
+            parts.push('[PERSONA]');
+            parts.push(agentConfig.system_prompt);
+            parts.push('');
+        }
+        
+        // ===== DYNAMIC RESPONSE TEMPLATE =====
+        // Load response_template from metadata if available
+        if (agentConfig.metadata && typeof agentConfig.metadata === 'object') {
+            const metadata = agentConfig.metadata as any;
+            if (metadata.response_template) {
+                const template = typeof metadata.response_template === 'string' 
+                    ? JSON.parse(metadata.response_template) 
+                    : metadata.response_template;
+                
+                if (template.prefix) {
+                    parts.push('[GREETING_PREFIX]');
+                    parts.push(`Start your response with: "${template.prefix}"`);
+                    parts.push('');
+                }
+                
+                if (template.style) {
+                    parts.push('[RESPONSE_STYLE]');
+                    parts.push(`Style: ${template.style}`);
+                    if (template.include_code_explanation) {
+                        parts.push('- Include code explanations when relevant');
+                    }
+                    parts.push('');
+                }
+            }
+        }
+        
         // ===== RESPONSE RULES =====
         parts.push('[RESPONSE RULES]');
         parts.push('- Reply in English only.');
         parts.push('- Keep your response short (2-3 sentences).');
         parts.push('- Never make up words or hallucinate.');
+        parts.push('- Never identify as Alibaba, Qwen, LLaMA, or any other base AI model.');
         parts.push('');
         
         // ===== USER QUESTION =====

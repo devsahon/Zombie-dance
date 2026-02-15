@@ -289,7 +289,7 @@ router.post('/:agentId/call', async (req, res) => {
       const numericId = parseInt(agentId, 10);
       
       const agentData = await executeQuery(
-        'SELECT id, name, type, status, config FROM agents WHERE id = ?',
+        'SELECT id, name, type, status, persona_name, description, config, metadata FROM agents WHERE id = ?',
         [numericId]
       );
       
@@ -309,6 +309,10 @@ router.post('/:agentId/call', async (req, res) => {
           ? JSON.parse(dbAgent.config) 
           : dbAgent.config;
         
+        const metadata = typeof dbAgent.metadata === 'string'
+          ? JSON.parse(dbAgent.metadata)
+          : dbAgent.metadata;
+        
         // Build agent config for Ollama service
         agentConfig = {
           id: dbAgent.id,
@@ -317,7 +321,8 @@ router.post('/:agentId/call', async (req, res) => {
           status: dbAgent.status,
           persona_name: dbAgent.persona_name,
           system_prompt: dbAgent.system_prompt,
-          config: config || {}
+          config: config || {},
+          metadata: metadata || {}
         };
         
         if (config?.model) {

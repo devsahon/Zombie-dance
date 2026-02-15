@@ -171,7 +171,7 @@ export class WebSocketService {
             if (isNumericId) {
                 const numericId = parseInt(agentId, 10);
                 const agentData = await executeQuery(
-                    'SELECT id, name, type, status, config, metadata FROM agents WHERE id = ?',
+                    'SELECT id, name, type, status, config, metadata, model_name FROM agents WHERE id = ?',
                     [numericId]
                 );
                 
@@ -202,7 +202,10 @@ export class WebSocketService {
                             metadata: metadata
                         };
                         
-                        if (config?.model) {
+                        // Use model_name from database, or config.model, or default
+                        if (dbAgent.model_name) {
+                            modelName = dbAgent.model_name;
+                        } else if (config?.model) {
                             modelName = config.model;
                         }
                     } catch (parseError) {
