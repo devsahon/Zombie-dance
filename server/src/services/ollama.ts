@@ -73,7 +73,9 @@ export interface AgentConfig {
         };
         system_instructions?: string;
         model?: string;
+        metadata?: Record<string, any>;
     };
+    metadata?: Record<string, any>;
 }
 
 export interface ChatResponse {
@@ -122,8 +124,20 @@ export class OllamaService {
     private buildSystemPrompt(agentConfig?: AgentConfig): string {
         const parts: string[] = [];
 
+        // Get system_prompt from metadata if available
+        let systemPromptFromDB = agentConfig?.system_prompt;
+        if (!systemPromptFromDB && agentConfig?.config?.metadata) {
+            const metadata = agentConfig.config.metadata as any;
+            systemPromptFromDB = metadata?.system_prompt;
+        }
+        // Also check top-level metadata field
+        if (!systemPromptFromDB && agentConfig?.metadata) {
+            const metadata = agentConfig.metadata as any;
+            systemPromptFromDB = metadata?.system_prompt;
+        }
+
         // If agent has a custom system_prompt from database, use it first
-        if (agentConfig?.system_prompt) {
+        if (systemPromptFromDB) {
             // Prepend identity info
             if (identityData) {
                 const identity = identityData.system_identity;
@@ -136,7 +150,7 @@ export class OllamaService {
                 parts.push('');
             }
             // Add the database system prompt
-            parts.push(agentConfig.system_prompt);
+            parts.push(systemPromptFromDB);
             return parts.join('\n');
         }
 
@@ -267,7 +281,13 @@ export class OllamaService {
                 {
                     model: model || agentConfig?.config?.model || this.defaultModel,
                     prompt: fullPrompt,
-                    stream: false
+                    stream: false,
+                    options: {
+                        temperature: 0.05,
+                        top_p: 0.3,
+                        num_predict: 300,
+                        stop: ["User:", "Assistant:", "\n\n"]
+                    }
                 },
                 {
                     timeout: 180000 // 180 seconds timeout for complex prompts
@@ -304,7 +324,13 @@ export class OllamaService {
                 {
                     model: model || agentConfig?.config?.model || this.defaultModel,
                     messages: allMessages,
-                    stream: true
+                    stream: true,
+                    options: {
+                        temperature: 0.05,
+                        top_p: 0.3,
+                        num_predict: 300,
+                        stop: ["User:", "Assistant:", "\n\n"]
+                    }
                 },
                 {
                     timeout: 60000

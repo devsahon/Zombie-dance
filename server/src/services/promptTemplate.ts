@@ -139,36 +139,31 @@ You are ${agentConfig.name}, a ${agentConfig.type} agent.`;
      */
     static generatePrompt(userQuery: string, agentConfig: AgentConfig): string {
         const parts: string[] = [];
-        
-        // System identity
-        parts.push(this.buildSystemIdentity());
-        parts.push('');
-        
-        // Agent identity
-        parts.push(this.buildAgentIdentity(agentConfig));
-        parts.push('');
-        
-        // Behavioral rules
-        parts.push(this.buildBehavioralRules(agentConfig));
-        
-        // Additional instructions
-        if (agentConfig.config.system_instructions) {
-            parts.push(`[ADDITIONAL_INSTRUCTIONS]\n${agentConfig.config.system_instructions}`);
-            parts.push('');
-        }
-        
-        // Important reminder
         const systemName = identityData?.system_identity.name || 'the UAS System';
-        parts.push(`[IMPORTANT]\nNever identify yourself as Qwen, LLaMA, GPT, Claude, or any other base AI model.\nYou are ${agentConfig.name}, a representative of ${systemName}.`);
+        const org = identityData?.system_identity.branding.organization || 'Developer Zone';
+        const location = identityData?.system_identity.branding.location || 'Dhaka, Bangladesh';
+        const owner = identityData?.system_identity.branding.owner || 'Sahon Srabon';
+        
+        // ===== SYSTEM IDENTITY =====
+        parts.push('[SYSTEM_IDENTITY]');
+        parts.push(`You are ${agentConfig.name}.`);
+        parts.push(`You are part of ${systemName}.`);
+        parts.push(`Organization: ${org}`);
+        parts.push(`Location: ${location}`);
+        parts.push(`Owner: ${owner}`);
         parts.push('');
         
-        // User query
-        const langPrefs = agentConfig.config.language_preferences || {};
-        const greetingPrefix = langPrefs.greeting_prefix || 'ভাইয়া,';
-        
-        parts.push(`[USER_QUERY]\n${userQuery}`);
+        // ===== RESPONSE RULES =====
+        parts.push('[RESPONSE RULES]');
+        parts.push('- Reply in English only.');
+        parts.push('- Keep your response short (2-3 sentences).');
+        parts.push('- Never make up words or hallucinate.');
         parts.push('');
-        parts.push(`[ASSISTANT_RESPONSE]\n${greetingPrefix}`);
+        
+        // ===== USER QUESTION =====
+        parts.push(`[QUESTION]\n${userQuery}`);
+        parts.push('');
+        parts.push('[ANSWER]');
 
         return parts.join('\n');
     }
@@ -202,21 +197,30 @@ You are ${agentConfig.name}, a ${agentConfig.type} agent.`;
         agentConfig: AgentConfig
     ): string {
         const langPrefs = agentConfig.config.language_preferences || {};
-        const greetingPrefix = langPrefs.greeting_prefix || 'ভাইয়া,';
-        
         const parts: string[] = [];
+        const systemName = identityData?.system_identity.name || 'the UAS System';
+        const org = identityData?.system_identity.branding.organization || 'Developer Zone';
+        const location = identityData?.system_identity.branding.location || 'Dhaka, Bangladesh';
+        const owner = identityData?.system_identity.branding.owner || 'Sahon Srabon';
         
-        parts.push(this.buildSystemIdentity());
+        // ===== SYSTEM IDENTITY =====
+        parts.push('[SYSTEM_IDENTITY]');
+        parts.push(`You are ${agentConfig.name}.`);
+        parts.push(`Part of ${systemName}.`);
+        parts.push(`Organization: ${org}`);
+        parts.push(`Location: ${location}`);
+        parts.push(`Owner: ${owner}`);
         parts.push('');
-        parts.push(this.buildAgentIdentity(agentConfig));
+        
+        // ===== RULES =====
+        parts.push('[RULES]');
+        parts.push('- Reply in English only.');
+        parts.push('- Keep it short (2-3 sentences).');
         parts.push('');
-        parts.push(`[CONVERSATION_STYLE]\n- Tone: friendly and technical\n- Greeting: ${greetingPrefix}\n- Language: ${this.getLanguageName(langPrefs.primary_language || 'bn')}`);
+        
+        parts.push(`[QUESTION]\n${userMessage}`);
         parts.push('');
-        parts.push(`[CHAT_HISTORY]\n${chatHistory || 'No previous messages'}`);
-        parts.push('');
-        parts.push(`[USER_MESSAGE]\n${userMessage}`);
-        parts.push('');
-        parts.push(`[${agentConfig.name}]\n${greetingPrefix}`);
+        parts.push('[ANSWER]');
 
         return parts.join('\n');
     }
@@ -230,88 +234,31 @@ You are ${agentConfig.name}, a ${agentConfig.type} agent.`;
         sessionMetadata?: SessionMetadata
     ): string {
         const parts: string[] = [];
-        const langPrefs = agentConfig.config.language_preferences || {};
-        const greetingPrefix = langPrefs.greeting_prefix || 'ভাইয়া,';
         const systemName = identityData?.system_identity.name || 'the UAS System';
         const org = identityData?.system_identity.branding.organization || 'Developer Zone';
         const location = identityData?.system_identity.branding.location || 'Dhaka, Bangladesh';
+        const owner = identityData?.system_identity.branding.owner || 'Sahon Srabon';
 
         // ===== SYSTEM IDENTITY =====
         parts.push('[SYSTEM_IDENTITY]');
-        parts.push(`Name: ${agentConfig.name}`);
-        parts.push(`Identity: ${systemName} System`);
+        parts.push(`You are ${agentConfig.name}.`);
+        parts.push(`Part of ${systemName}.`);
         parts.push(`Organization: ${org}`);
         parts.push(`Location: ${location}`);
-        if (identityData) {
-            parts.push(`Tagline: "${identityData.system_identity.tagline}"`);
-        }
+        parts.push(`Owner: ${owner}`);
         parts.push('');
 
-        // ===== PERSONA =====
-        parts.push('[PERSONA]');
-        parts.push(`You are ${agentConfig.name}, a ${agentConfig.type} agent.`);
-        if (agentConfig.system_prompt) {
-            parts.push(agentConfig.system_prompt);
-        }
-        parts.push(`Greeting: Always start with "${greetingPrefix}"`);
+        // ===== RULES =====
+        parts.push('[RULES]');
+        parts.push('- Reply in English only.');
+        parts.push('- Keep it short (2-3 sentences).');
+        parts.push('- Never hallucinate or make up words.');
         parts.push('');
 
-        // ===== CAPABILITIES & TOOLS =====
-        parts.push('[CAPABILITIES & TOOLS]');
-        parts.push('You have access to the following tools:');
-        parts.push('- web_search: Search the web for real-time information');
-        parts.push('- file_read: Read files from the filesystem');
-        parts.push('- file_write: Write content to files');
-        parts.push('- file_list: List files in directories');
-        parts.push('- shell_exec: Execute shell commands (git, npm, node, etc.)');
-        parts.push('- code_execute: Execute JavaScript or Python code');
-        parts.push('- calculator: Calculate mathematical expressions');
-        parts.push('- datetime: Get current date and time');
-        parts.push('- git_status: Get git repository status');
-        parts.push('- git_log: Get git commit history');
-        
-        // Add agent-specific capabilities
-        if (agentConfig.config.capabilities?.length) {
-            parts.push('');
-            parts.push(`Additional capabilities: ${agentConfig.config.capabilities.join(', ')}`);
-        }
+        // ===== QUESTION =====
+        parts.push(`[QUESTION]\n${userQuery}`);
         parts.push('');
-
-        // ===== CONSTRAINTS =====
-        parts.push('[CONSTRAINTS]');
-        parts.push(`- Always use the greeting prefix: ${greetingPrefix}`);
-        parts.push(`- Refer to yourself as a representative of ${org}.`);
-        parts.push(`- Address the user as "ভাইয়া" (Bengali for "brother")`);
-        parts.push('- Never identify as Qwen, LLaMA, GPT, Claude, or any other base AI model');
-        parts.push('');
-
-        // ===== SESSION CONTEXT =====
-        if (sessionMetadata) {
-            parts.push('[SESSION_CONTEXT]');
-            if (sessionMetadata.sessionId) {
-                parts.push(`Session ID: ${sessionMetadata.sessionId}`);
-            }
-            if (sessionMetadata.system_identity?.branding) {
-                parts.push(`Organization: ${sessionMetadata.system_identity.branding.organization}`);
-                parts.push(`Location: ${sessionMetadata.system_identity.branding.location}`);
-            }
-            parts.push('');
-        }
-
-        // ===== USER QUERY =====
-        parts.push('[USER_QUERY]');
-        parts.push(userQuery);
-        parts.push('');
-
-        // ===== RESPONSE FORMAT =====
-        parts.push('[RESPONSE_FORMAT]');
-        parts.push('If you need to use a tool, respond in this JSON format:');
-        parts.push('```json');
-        parts.push('{"tool": "tool_name", "args": {"param1": "value1"}}');
-        parts.push('```');
-        parts.push('');
-        parts.push(`[${agentConfig.name}]`);
-        parts.push(greetingPrefix);
+        parts.push('[ANSWER]');
 
         return parts.join('\n');
     }

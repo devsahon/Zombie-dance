@@ -171,7 +171,7 @@ export class WebSocketService {
             if (isNumericId) {
                 const numericId = parseInt(agentId, 10);
                 const agentData = await executeQuery(
-                    'SELECT id, name, type, status, config FROM agents WHERE id = ?',
+                    'SELECT id, name, type, status, config, metadata FROM agents WHERE id = ?',
                     [numericId]
                 );
                 
@@ -182,6 +182,14 @@ export class WebSocketService {
                             ? JSON.parse(dbAgent.config) 
                             : dbAgent.config;
                         
+                        // Parse metadata if exists
+                        let metadata: any = {};
+                        if (dbAgent.metadata) {
+                            metadata = typeof dbAgent.metadata === 'string' 
+                                ? JSON.parse(dbAgent.metadata) 
+                                : dbAgent.metadata;
+                        }
+                        
                         // Build agent config for Ollama service
                         agentConfig = {
                             id: dbAgent.id,
@@ -189,8 +197,9 @@ export class WebSocketService {
                             type: dbAgent.type,
                             status: dbAgent.status,
                             persona_name: dbAgent.persona_name,
-                            system_prompt: dbAgent.system_prompt,
-                            config: config || {}
+                            system_prompt: metadata?.system_prompt || '',
+                            config: config || {},
+                            metadata: metadata
                         };
                         
                         if (config?.model) {
