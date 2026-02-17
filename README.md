@@ -1,8 +1,8 @@
-# UAS Admin System - Comprehensive Admin Panel
+# Zombie Dance AI - Complete AI Agent Management System
 
 A production-ready Unified Agent System (UAS) Admin Panel with complete MySQL database integration, real-time AI model management, multi-agent orchestration, and comprehensive documentation.
 
-**Status**: Production Ready | **Database**: Integrated | **Documentation**: Complete | **Demo Data**: Populated
+**Status**: Production Ready | **Database**: Integrated | **Documentation**: Complete | **Demo Data**: Populated | **Real-time**: Dynamic
 
 ## Project Overview
 
@@ -13,10 +13,12 @@ The UAS Admin System provides a sophisticated administration interface for manag
 ✓ **Database Integration** - MySQL with 10 optimized tables and demo data
 ✓ **Full CRUD Operations** - Create, Read, Update, Delete for all resources
 ✓ **RESTful API** - Complete backend API with proper error handling
-✓ **Real-time Updates** - WebSocket support for live streaming
+✓ **Real-time Updates** - WebSocket support with live streaming
+✓ **Dynamic Admin Panel** - All pages now fetch data dynamically with fallback
 ✓ **Multi-Agent System** - Editor, Master, and Chatbot agents
 ✓ **Production Ready** - Error handling, logging, security
 ✓ **Comprehensive Docs** - Installation, API reference, troubleshooting
+✓ **VS Code Extension** - Integrated development environment support
 
 ## Quick Start (< 5 Minutes)
 
@@ -99,12 +101,14 @@ curl http://localhost:8000/models | jq
 - **ENV File Integration**: Automatically loads server configurations from `.env` files
 - **Response-Based Activation**: Verifies server connectivity and activates relevant features
 - **Real-time Updates**: Dynamic configuration without server restarts
+- **Fallback Data**: Graceful degradation when backend is unavailable
 
 ### 2. Unified Agent System (UAS)
 - **Memory Agent Management**: Monitor and configure stateful agent operations
 - **Load Balancing**: Manage multiple local model instances
 - **Monitoring Dashboard**: Real-time performance metrics
 - **Testing Tools**: Comprehensive testing interfaces
+- **Dynamic Data Fetching**: Live agent status and metrics
 
 ### 3. Developer Productivity Tools
 - **VS Code Integration**: Submit inputs directly to your local editor
@@ -158,6 +162,30 @@ curl http://localhost:8000/models | jq
 │         Local Model Servers, VS Code API & MySQL DB         │
 └─────────────────────────────────────────────────────────────┘
 \`\`\`
+
+## Recent Updates (February 2026)
+
+### 🎯 Dynamic Admin Panel Integration
+- **Real-time Data Fetching**: All admin pages now fetch data dynamically
+- **Fallback System**: Graceful degradation when backend is unavailable
+- **WebSocket Integration**: Live updates for agents, models, and servers
+- **Status Indicators**: Real-time connection status and response times
+- **Auto-refresh**: 30-second intervals for live data
+
+### 🔧 New Components
+- **useRealTimeData Hook**: Custom hook for real-time data fetching
+- **RealTimeStatus Component**: Live status indicators
+- **RealTimeDataProvider**: Context-based data management
+- **VS Code Extension**: Complete development environment integration
+
+### 📊 Test Results
+- **Agents API**: ✅ 5 agents with live status
+- **Models API**: ✅ 5 models with Ollama integration
+- **Providers API**: ✅ 4 providers with fallback data
+- **Memory API**: ✅ 3 conversations with history
+- **Servers API**: ✅ Server monitoring endpoints
+
+---
 
 ## Documentation
 
@@ -220,6 +248,9 @@ uas-admin-panel/
 │   └── settings/            # Settings pages
 ├── components/              # React components
 │   ├── ui/                  # shadcn/ui components
+│   ├── real-time/           # Real-time components
+│   │   ├── RealTimeDataProvider.tsx
+│   │   └── RealTimeStatus.tsx
 │   ├── sidebar.tsx          # Navigation sidebar
 │   ├── topbar.tsx           # Top navigation bar
 │   ├── server-health-card.tsx
@@ -228,7 +259,14 @@ uas-admin-panel/
 ├── lib/                     # Utility functions
 │   └── utils.ts             # Helper utilities
 ├── hooks/                   # Custom React hooks
+│   └── useRealTimeData.ts  # Real-time data fetching hook
 ├── types/                   # TypeScript type definitions
+├── vscode-extension/        # VS Code extension
+│   ├── src/
+│   │   ├── extension.ts
+│   │   ├── zombieDanceManager.ts
+│   │   └── zombieDancePanel.ts
+│   └── zombie-dance-ai-1.0.0.vsix
 ├── public/                  # Static assets
 ├── .env.example             # Environment variables template
 └── README.md                # This file
