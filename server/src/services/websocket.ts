@@ -3,6 +3,15 @@ import { Logger } from '../utils/logger';
 import { OllamaService } from './ollama';
 import { executeQuery } from '../database/connection';
 
+// Simple UUID generator
+function generateUUID(): string {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
 interface WebSocketMessage {
     type: string;
     data?: any;
@@ -214,13 +223,17 @@ export class WebSocketService {
                 }
             }
             
-            // Send start message
+            // Send start message with session ID
+            const sessionId = generateUUID();
             this.sendMessage(ws, {
                 type: 'agent_stream_start',
                 data: {
+                    sessionId,
                     agentId,
                     action,
                     agentName: agentConfig?.name || (isNumericId ? `Agent ${agentId}` : agentId),
+                    persona: agentConfig?.persona_name || dbAgent?.persona_name || 'Unknown',
+                    model: modelName,
                     message: `Starting ${action} with ${agentConfig?.name || agentId}...`
                 }
             });
@@ -289,15 +302,17 @@ export class WebSocketService {
                 return;
             }
             
-            // Send complete message
+            // Send complete message with session info
             this.sendMessage(ws, {
                 type: 'agent_stream_complete',
                 data: {
+                    sessionId,
                     response,
                     agentId,
                     action,
                     model: modelName,
                     agentName: dbAgent?.name || (isNumericId ? `Agent ${agentId}` : agentId),
+                    persona: agentConfig?.persona_name || dbAgent?.persona_name || 'Unknown',
                     timestamp: new Date().toISOString()
                 }
             });

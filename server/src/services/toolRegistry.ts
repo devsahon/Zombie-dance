@@ -1,10 +1,14 @@
 /**
  * Tool Registry
- * Centralized tool management for agents
- * Based on the Architecture.md specification
+ * Centralized tool management for agents with LangChain integration
+ * Supports DuckDuckGo search, shell execution, and custom dynamic tools
  */
 
 import { executeQuery } from '../database/connection';
+import { DynamicTool } from '@langchain/core/tools';
+import { Tool } from '@langchain/core/tools';
+import { execSync } from 'child_process';
+import path from 'path';
 
 export interface ToolConfig {
     name: string;
@@ -21,6 +25,277 @@ export interface AgentTool {
     toolCategory: string;
     isActive: boolean;
     config: Record<string, any>;
+}
+
+/**
+ * LangChain Tool Factory
+ * Creates LangChain-compatible tools from registry configuration
+ */
+export class LangChainToolFactory {
+    private static projectRoot = '/home/sahon/Zombie-dance';
+    
+    /**
+     * Create a LangChain Tool from registry config
+     */
+    static createTool(toolName: string, config: Record<string, any>): Tool | null {
+        switch (toolName) {
+            case 'shell_exec':
+                return this.createShellTool(config);
+            case 'file_read':
+                return this.createFileReadTool(config);
+            case 'file_write':
+                return this.createFileWriteTool(config);
+            case 'calculator':
+                return this.createCalculatorTool();
+            case 'datetime':
+                return this.createDateTimeTool();
+            case 'web_search':
+                return this.createWebSearchTool(config);
+            default:
+                return null;
+        }
+    }
+    
+    /**
+     * Shell command execution tool (sandboxed)
+     */
+    private static createShellTool(config: Record<string, any>): Tool {
+        const allowedCommands = config.allowed_commands || ['git', 'npm', 'node', 'python', 'ls', 'cat'];
+        
+        return new DynamicTool({
+            name: 'shell_executor',
+            description: `Execute local shell commands. Allowed commands: ${allowedCommands.join(', ')}. Always run in ${this.projectRoot} directory.`,
+            func: async (command: string) => {
+                try {
+                    // Security check: only allow specific commands
+                    const cmdFirst = command.trim().split(/\s+/)[0];
+                    if (!allowedCommands.includes(cmdFirst)) {
+                        return `Error: Command '${cmdFirst}' is not allowed. Allowed: ${allowedCommands.join(', ')}`;
+                    }
+                    
+                    const output = execSync(command, { 
+                        cwd: this.projectRoot,
+                        timeout: 30000,
+                        maxBuffer: 10 * 1024 * 1024 // 10MB
+                    });
+                    return output.toString();
+                } catch (e: any) {
+                    return `Error: ${e.message}`;
+                }
+            },
+        });
+    }
+    
+    /**
+     * File read tool
+     */
+    private static createFileReadTool(config: Record<string, any>): Tool {
+        const allowedDirs = config.allowed_dirs || [this.projectRoot];
+        
+        return new DynamicTool({
+            name: 'file_reader',
+            description: `Read files from allowed directories: ${allowedDirs.join(', ')}`,
+            func: async (filePath: string) => {
+                try {
+                    const fs = require('fs');
+                    const fullPath = filePath.startsWith('/') ? filePath : path.join(this.projectRoot, filePath);
+                    
+                    // Security check: ensure path is within allowed directories
+                    const isAllowed = allowedDirs.some((dir: string) => fullPath.startsWith(dir));
+                    if (!isAllowed) {
+                        return `Error: Path '${filePath}' is not in allowed directories`;
+                    }
+                    
+                    if (!fs.existsSync(fullPath)) {
+                        return `Error: File '${filePath}' does not exist`;
+                    }
+                    
+                    const content = fs.readFileSync(fullPath, 'utf-8');
+                    return `File: ${filePath}\n\n${content}`;
+                } catch (e: any) {
+                    return `Error reading file: ${e.message}`;
+                }
+            },
+        });
+    }
+    
+    /**
+     * File write tool
+     */
+    private static createFileWriteTool(config: Record<string, any>): Tool {
+        const allowedDirs = config.allowed_dirs || [this.projectRoot];
+        
+        return new DynamicTool({
+            name: 'file_writer',
+            description: `Write content to files in allowed directories: ${allowedDirs.join(', ')}`,
+            func: async (input: string) => {
+                try {
+                    const fs = require('fs');
+                    // Format: "filename|content" or JSON {path, content}
+                    let filePath: string, content: string;
+                    
+                    if (input.includes('|')) {
+                        const parts = input.split('|');
+                        filePath = parts[0].trim();
+                        content = parts.slice(1).join('|');
+                    } else {
+                        return 'Error: Use format "filePath|content" or JSON {path, content}';
+                    }
+                    
+                    const fullPath = filePath.startsWith('/') ? filePath : path.join(this.projectRoot, filePath);
+                    
+                    // Security check
+                    const isAllowed = allowedDirs.some((allowedDir: string) => fullPath.startsWith(allowedDir));
+                    if (!isAllowed) {
+                        return `Error: Path '${filePath}' is not in allowed directories`;
+                    }
+                    
+                    // Ensure directory exists
+                    const dirPath = path.dirname(fullPath);
+                    if (!fs.existsSync(dirPath)) {
+                        fs.mkdirSync(dirPath, { recursive: true });
+                    }
+                    
+                    fs.writeFileSync(fullPath, content, 'utf-8');
+                    return `Success: File '${filePath}' written`;
+                } catch (e: any) {
+                    return `Error writing file: ${e.message}`;
+                }
+            },
+        });
+    }
+    
+    /**
+     * Calculator tool
+     */
+    private static createCalculatorTool(): Tool {
+        return new DynamicTool({
+            name: 'calculator',
+            description: 'Calculate mathematical expressions. Input: a mathematical expression like "2+2" or "sqrt(16)"',
+            func: async (expression: string) => {
+                try {
+                    // Safe math evaluation (basic)
+                    const safeEval = (expr: string) => {
+                        // Only allow numbers, operators, and math functions
+                        if (!/^[0-9+\-*/().\ssqrtpowabsminmax]+$/i.test(expr)) {
+                            throw new Error('Invalid characters in expression');
+                        }
+                        // Replace common math functions
+                        let processed = expr
+                            .replace(/sqrt/g, 'Math.sqrt')
+                            .replace(/pow/g, 'Math.pow')
+                            .replace(/abs/g, 'Math.abs')
+                            .replace(/min/g, 'Math.min')
+                            .replace(/max/g, 'Math.max')
+                            .replace(/pi/gi, 'Math.PI')
+                            .replace(/e(?![xp])/gi, 'Math.E');
+                        return eval(processed);
+                    };
+                    
+                    const result = safeEval(expression);
+                    return `${expression} = ${result}`;
+                } catch (e: any) {
+                    return `Error: ${e.message}`;
+                }
+            },
+        });
+    }
+    
+    /**
+     * DateTime tool
+     */
+    private static createDateTimeTool(): Tool {
+        return new DynamicTool({
+            name: 'datetime',
+            description: 'Get current date and time. Input can be "now", "date", "time", or "full"',
+            func: async (type: string = 'full') => {
+                const now = new Date();
+                const bdTime = new Date(now.getTime() + 6 * 60 * 60 * 1000); // UTC+6 for Bangladesh
+                
+                switch (type.toLowerCase()) {
+                    case 'date':
+                        return bdTime.toLocaleDateString('en-BD', { timeZone: 'Asia/Dhaka' });
+                    case 'time':
+                        return bdTime.toLocaleTimeString('en-BD', { timeZone: 'Asia/Dhaka' });
+                    case 'now':
+                    case 'full':
+                    default:
+                        return bdTime.toLocaleString('en-BD', { 
+                            timeZone: 'Asia/Dhaka',
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit'
+                        });
+                }
+            },
+        });
+    }
+    
+    /**
+     * Web search tool (using fetch to DuckDuckGo HTML)
+     */
+    private static createWebSearchTool(config: Record<string, any>): Tool {
+        const maxResults = config.maxResults || 3;
+        
+        return new DynamicTool({
+            name: 'web_search',
+            description: `Search the web for real-time information. Returns top ${maxResults} results.`,
+            func: async (query: string) => {
+                try {
+                    const axios = require('axios');
+                    const encodedQuery = encodeURIComponent(query);
+                    const url = `https://html.duckduckgo.com/html/?q=${encodedQuery}`;
+                    
+                    const response = await axios.get(url, { timeout: 10000 });
+                    const html = response.data;
+                    
+                    // Simple HTML parsing to extract results
+                    const results: string[] = [];
+                    const resultRegex = /<a class="result__a"[^>]*href="[^"]*"[^>]*>([^<]+)<\/a>/g;
+                    const snippetRegex = /<a class="result__snippet"[^>]*>([^<]+)<\/a>/g;
+                    
+                    let match;
+                    let count = 0;
+                    
+                    // Extract titles
+                    while ((match = resultRegex.exec(html)) !== null && count < maxResults) {
+                        const title = match[1].replace(/<[^>]+>/g, '').trim();
+                        results.push(`${count + 1}. ${title}`);
+                        count++;
+                    }
+                    
+                    if (results.length === 0) {
+                        return `No results found for "${query}"`;
+                    }
+                    
+                    return `Search results for "${query}":\n\n${results.join('\n')}`;
+                } catch (e: any) {
+                    return `Search error: ${e.message}`;
+                }
+            },
+        });
+    }
+    
+    /**
+     * Get all LangChain tools for an agent
+     */
+    static async getAgentLangChainTools(agentId: number): Promise<Tool[]> {
+        const agentTools = await ToolRegistry.getAgentTools(agentId);
+        const tools: Tool[] = [];
+        
+        for (const agentTool of agentTools) {
+            const tool = this.createTool(agentTool.toolName, agentTool.config);
+            if (tool) {
+                tools.push(tool);
+            }
+        }
+        
+        return tools;
+    }
 }
 
 /**

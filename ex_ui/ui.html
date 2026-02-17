@@ -1,0 +1,2646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZombieCoder | AI Workspace v2.0</title>
+    <!-- Font Awesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Xterm CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.1.0/css/xterm.css" />
+    <style>
+        /* --- 1. CORE VARIABLES & RESET --- */
+        :root {
+            /* Dark Theme (Default) */
+            --bg-dark: #0f1117;
+            --bg-darker: #0a0c13;
+            --glass-bg: rgba(18, 20, 27, 0.95);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --primary-blue: #3b82f6;
+            --zombie-green: #10b981;
+            --accent-purple: #8b5cf6;
+            --text-main: #e5e7eb;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+            --sidebar-width: 260px;
+            --header-height: 48px;
+            --danger-red: #ef4444;
+            --warning-yellow: #f59e0b;
+            
+            /* Light Theme Variables */
+            --bg-light: #ffffff;
+            --bg-lighter: #f8fafc;
+            --glass-bg-light: rgba(255, 255, 255, 0.95);
+            --glass-border-light: rgba(0, 0, 0, 0.08);
+            --text-main-light: #1e293b;
+            --text-muted-light: #475569;
+            --text-dim-light: #94a3b8;
+        }
+
+        [data-theme="light"] {
+            --bg-dark: var(--bg-light);
+            --bg-darker: var(--bg-lighter);
+            --glass-bg: var(--glass-bg-light);
+            --glass-border: var(--glass-border-light);
+            --text-main: var(--text-main-light);
+            --text-muted: var(--text-muted-light);
+            --text-dim: var(--text-dim-light);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            font-size: 13px;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        /* --- 2. RESPONSIVE LAYOUT --- */
+        @media (max-width: 1024px) {
+            :root {
+                --sidebar-width: 220px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                z-index: 100;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
+            }
+            
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                width: 100%;
+            }
+            
+            .menu-toggle {
+                display: flex !important;
+            }
+            
+            .chat-messages {
+                padding: 16px !important;
+            }
+            
+            .chat-input-area {
+                padding: 0 16px 16px !important;
+            }
+            
+            .settings-grid {
+                grid-template-columns: 1fr !important;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header-buttons {
+                gap: 4px !important;
+            }
+            
+            .header-btn span {
+                display: none;
+            }
+            
+            .model-selector {
+                min-width: 100px !important;
+            }
+            
+            .chat-title {
+                max-width: 150px !important;
+            }
+        }
+
+        /* --- 3. SIDEBAR --- */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-darker);
+            border-right: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            position: relative;
+            z-index: 50;
+            transition: width 0.3s ease, transform 0.3s ease;
+        }
+
+        @media (max-width: 640px) {
+            .sidebar {
+                width: 100%;
+            }
+        }
+
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            color: var(--text-main);
+            font-size: 16px;
+        }
+
+        .logo-icon {
+            width: 28px;
+            height: 28px;
+            background: linear-gradient(135deg, var(--zombie-green), var(--primary-blue));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .menu-toggle {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 6px;
+        }
+
+        .menu-toggle:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .new-chat-btn {
+            width: 100%;
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-weight: 500;
+        }
+
+        .new-chat-btn:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        .history-section {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .history-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            padding-left: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .history-actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .history-action-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            padding: 2px;
+            border-radius: 4px;
+        }
+
+        .history-action-btn:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .history-item {
+            padding: 10px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 13px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            position: relative;
+        }
+
+        .history-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+        }
+
+        .history-item.active {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--text-main);
+            border-left: 2px solid var(--primary-blue);
+        }
+
+        .history-item-delete {
+            position: absolute;
+            right: 8px;
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            padding: 2px;
+            border-radius: 4px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .history-item:hover .history-item-delete {
+            opacity: 1;
+        }
+
+        .history-item-delete:hover {
+            color: var(--danger-red);
+        }
+
+        .history-icon {
+            width: 14px;
+            height: 14px;
+            opacity: 0.7;
+            flex-shrink: 0;
+        }
+
+        /* --- 4. MAIN CONTENT AREA --- */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background: var(--bg-dark);
+            overflow: hidden;
+            width: calc(100% - var(--sidebar-width));
+            transition: width 0.3s ease;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                width: 100%;
+            }
+        }
+
+        /* --- 5. HEADER --- */
+        .main-header {
+            height: var(--header-height);
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            background: rgba(10, 12, 19, 0.7);
+            backdrop-filter: blur(10px);
+            position: relative;
+            z-index: 10;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .chat-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-main);
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .header-buttons {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .header-btn {
+            background: transparent;
+            border: 1px solid var(--glass-border);
+            color: var(--text-muted);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            height: 32px;
+        }
+
+        .header-btn:hover {
+            border-color: rgba(59, 130, 246, 0.5);
+            color: var(--primary-blue);
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .header-btn.primary {
+            background: var(--zombie-green);
+            color: white;
+            border-color: var(--zombie-green);
+        }
+
+        .header-btn.primary:hover {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+
+        .icon-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 6px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            width: 32px;
+            height: 32px;
+        }
+
+        .icon-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+        }
+
+        .icon-btn.active {
+            color: var(--zombie-green);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        /* Dropdowns */
+        .dropdown {
+            position: relative;
+        }
+
+        .dropdown-content {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            padding: 8px;
+            min-width: 200px;
+            display: none;
+            z-index: 100;
+            margin-top: 6px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .dropdown.active .dropdown-content {
+            display: block;
+        }
+
+        .dropdown-item {
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 13px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dropdown-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+        }
+
+        .dropdown-item.selected {
+            color: var(--primary-blue);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        /* --- 6. CHAT CONTAINER --- */
+        .chat-container {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            max-width: 900px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .message {
+            display: flex;
+            gap: 16px;
+            position: relative;
+        }
+
+        .message.system-message {
+            background: rgba(59, 130, 246, 0.05);
+            border: 1px solid rgba(59, 130, 246, 0.1);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 8px;
+        }
+
+        .message-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 12px;
+            flex-shrink: 0;
+            margin-top: 4px;
+        }
+
+        .user-avatar {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+        }
+
+        .ai-avatar {
+            background: linear-gradient(135deg, var(--zombie-green), #059669);
+            color: white;
+        }
+
+        .message-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .sender-name {
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text-main);
+        }
+
+        .message-time {
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .message-text {
+            line-height: 1.5;
+            font-size: 14px;
+            color: var(--text-main);
+        }
+
+        .streaming-text {
+            border-right: 2px solid var(--zombie-green);
+            animation: blink 1s infinite;
+            padding-right: 2px;
+        }
+
+        @keyframes blink {
+            0%, 50% { border-color: var(--zombie-green); }
+            51%, 100% { border-color: transparent; }
+        }
+
+        /* Thinking & Execution States */
+        .thinking-state {
+            background: rgba(139, 92, 246, 0.1);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            margin: 12px 0;
+        }
+
+        .thinking-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--accent-purple);
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .execution-state {
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            margin: 12px 0;
+        }
+
+        .execution-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--warning-yellow);
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .terminal-permission {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            margin: 12px 0;
+        }
+
+        .permission-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--danger-red);
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .permission-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .permission-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .permission-btn.allow {
+            background: var(--zombie-green);
+            color: white;
+        }
+
+        .permission-btn.deny {
+            background: transparent;
+            border: 1px solid var(--glass-border);
+            color: var(--text-muted);
+        }
+
+        .permission-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        /* Terminal Commands */
+        .terminal-command {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            color: #50fa7b;
+            margin: 8px 0;
+            position: relative;
+            overflow-x: auto;
+        }
+
+        .terminal-prompt {
+            color: #8be9fd;
+            margin-right: 8px;
+        }
+
+        /* Planning Text */
+        .planning-text {
+            background: rgba(139, 92, 246, 0.1);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 6px;
+            padding: 12px;
+            margin: 8px 0;
+            position: relative;
+        }
+
+        .planning-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--accent-purple);
+            font-weight: 500;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .planning-step {
+            padding: 6px 0;
+            border-left: 2px solid rgba(139, 92, 246, 0.3);
+            padding-left: 12px;
+            margin-left: 8px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        .planning-step.completed {
+            color: var(--zombie-green);
+        }
+
+        /* Code Blocks */
+        .code-block {
+            background: rgba(30, 30, 46, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            margin: 12px 0;
+            overflow: hidden;
+        }
+
+        .code-header {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .code-language {
+            font-family: 'Consolas', monospace;
+            font-weight: 600;
+        }
+
+        .code-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .code-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            padding: 2px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+
+        .code-btn:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .code-content {
+            padding: 12px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+            overflow-x: auto;
+            color: #f8f8f2;
+        }
+
+        /* --- 7. CHAT INPUT AREA --- */
+        .chat-input-area {
+            padding: 0 24px 24px;
+            max-width: 900px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .input-container {
+            position: relative;
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            background: var(--glass-bg);
+            overflow: hidden;
+            transition: all 0.2s;
+        }
+
+        .input-container:focus-within {
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
+        }
+
+        .text-input {
+            width: 100%;
+            min-height: 120px;
+            max-height: 300px;
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            font-size: 14px;
+            line-height: 1.5;
+            resize: none;
+            outline: none;
+            padding: 16px;
+            font-family: inherit;
+        }
+
+        .text-input::placeholder {
+            color: var(--text-dim);
+        }
+
+        .input-toolbar {
+            padding: 12px 16px;
+            border-top: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(18, 20, 27, 0.7); /* Glass-like background */
+            backdrop-filter: blur(10px);
+            border-radius: 8px;
+            margin: 8px 16px;
+        }
+
+        .tool-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .attach-btn {
+            background: transparent;
+            border: 1px solid var(--glass-border);
+            border-radius: 6px;
+            padding: 6px 12px;
+            color: var(--text-muted);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .attach-btn:hover {
+            border-color: var(--primary-blue);
+            color: var(--primary-blue);
+        }
+
+        .file-preview {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 8px;
+            background: rgba(59, 130, 246, 0.1);
+            border-radius: 4px;
+            font-size: 12px;
+            color: var(--primary-blue);
+        }
+
+        .file-preview .close {
+            cursor: pointer;
+            padding: 2px;
+        }
+
+        .tool-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .model-selector {
+            background: transparent;
+            border: 1px solid var(--glass-border);
+            border-radius: 6px;
+            padding: 6px 12px;
+            color: var(--text-main);
+            font-size: 12px;
+            cursor: pointer;
+            min-width: 120px;
+        }
+
+        .model-selector:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+        }
+
+        .send-btn {
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .send-btn:hover:not(:disabled) {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* --- 8. TYPING INDICATOR --- */
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 12px 0;
+        }
+
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--zombie-green);
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        /* --- 9. STATUS BAR --- */
+        .status-bar {
+            border-top: 1px solid var(--glass-border);
+            padding: 8px 16px;
+            background: rgba(10, 12, 19, 0.7);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: var(--text-dim);
+            height: 32px;
+        }
+
+        .status-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .status-dot.connected {
+            background: var(--zombie-green);
+            box-shadow: 0 0 8px var(--zombie-green);
+        }
+
+        .status-dot.disconnected {
+            background: #ef4444;
+        }
+
+        /* --- 10. SETTINGS MODAL --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .settings-modal {
+            width: 600px;
+            max-width: 90vw;
+            max-height: 90vh;
+            background: var(--bg-darker);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .settings-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .section-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .settings-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        @media (max-width: 768px) {
+            .settings-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .setting-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .setting-label {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .setting-input {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--glass-border);
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: var(--text-main);
+            font-size: 13px;
+        }
+
+        .setting-input:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+        }
+
+        .api-url-container {
+            display: flex;
+            gap: 8px;
+        }
+
+        .api-url-input {
+            flex: 1;
+        }
+
+        .test-api-btn {
+            background: var(--zombie-green);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .test-api-btn:hover {
+            background: #059669;
+        }
+
+        .modal-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--glass-border);
+            background: rgba(0, 0, 0, 0.2);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        .modal-btn {
+            padding: 8px 20px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .modal-btn.primary {
+            background: var(--zombie-green);
+            color: white;
+            border: none;
+        }
+
+        .modal-btn.secondary {
+            background: transparent;
+            border: 1px solid var(--glass-border);
+            color: var(--text-muted);
+        }
+
+        .modal-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        /* --- 11. UTILITY CLASSES --- */
+        .hidden {
+            display: none;
+        }
+
+        .scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        .scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .blink {
+            animation: blink 1s infinite;
+        }
+
+        /* --- 12. PROMPT PREDICTION --- */
+        .prompt-suggestions {
+            margin: 8px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .prompt-chip {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            padding: 4px 12px;
+            font-size: 12px;
+            color: var(--primary-blue);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .prompt-chip:hover {
+            background: rgba(59, 130, 246, 0.2);
+            transform: translateY(-1px);
+        }
+
+        /* Indexing Progress */
+        .indexing-progress {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 8px;
+            padding: 12px;
+            margin: 8px 0;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .progress-text {
+            font-size: 12px;
+            color: var(--zombie-green);
+            font-weight: 500;
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--zombie-green);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        /* --- 13. AGENT SELECTION BADGES --- */
+        .agent-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 11px;
+            color: var(--primary-blue);
+            margin-left: 8px;
+        }
+
+        /* --- 14. OVERLAY FOR MOBILE --- */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 90;
+            display: none;
+        }
+
+        .overlay.active {
+            display: block;
+        }
+        
+        /* Permission Modal */
+        .permission-modal {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            background: rgba(15, 17, 23, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--zombie-green);
+            padding: 20px;
+            border-radius: 12px;
+            z-index: 9999;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .permission-modal.active {
+            opacity: 1;
+            pointer-events: all;
+            transform: translate(-50%, -50%) scale(1);
+        }
+    </style>
+</head>
+<body>
+    <div id="permissionModal" class="permission-modal">
+        <h3 style="color: var(--zombie-green); margin-bottom: 10px;">
+            <i class="fas fa-shield-alt"></i> Permission Required
+        </h3>
+        <p id="permDesc" style="font-size: 14px; margin-bottom: 20px;"></p>
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <button onclick="closePerm()" style="background: transparent; color: white; border: 1px solid #444; padding: 5px 15px; border-radius: 4px; cursor: pointer;">Deny</button>
+            <button onclick="grantPerm()" style="background: var(--zombie-green); color: black; border: none; padding: 5px 15px; border-radius: 4px; font-weight: bold; cursor: pointer;">Allow Access</button>
+        </div>
+    </div>
+
+    <div id="terminal-container" style="height: 200px; background: #000; padding: 10px; border-top: 1px solid #333;"></div>
+    
+    <!-- SIDEBAR -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <div class="logo-icon">Z</div>
+                <span>ZombieCoder</span>
+            </div>
+            <button class="menu-toggle" id="menuToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+        
+        <div style="padding: 0 16px 16px;">
+            <button class="new-chat-btn" id="newChatBtn">
+                <i class="fas fa-plus"></i>
+                New Chat
+            </button>
+        </div>
+        
+        <div class="history-section scrollbar">
+            <div class="history-title">
+                <span>Conversations</span>
+                <div class="history-actions">
+                    <button class="history-action-btn" title="Clear History" id="clearHistoryBtn">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    <button class="history-action-btn" title="Refresh" id="refreshHistoryBtn">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="history-list" id="historyList">
+                <!-- History items will be populated -->
+            </div>
+        </div>
+    </div>
+
+    <!-- MOBILE OVERLAY -->
+    <div class="overlay" id="overlay"></div>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-content">
+        <!-- HEADER -->
+        <div class="main-header">
+            <div class="header-left">
+                <button class="menu-toggle" id="mobileMenuToggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="chat-title" id="chatTitle">New Conversation</div>
+            </div>
+            
+            <div class="header-buttons">
+                <button class="header-btn" id="indexBtn" title="Index Codebase">
+                    <i class="fas fa-code-branch"></i>
+                    <span>Index</span>
+                </button>
+                
+                <button class="header-btn" id="historyBtn" title="Chat History">
+                    <i class="fas fa-history"></i>
+                    <span>History</span>
+                </button>
+                
+                <div class="dropdown" id="agentDropdown">
+                    <button class="header-btn" id="agentBtn">
+                        <i class="fas fa-robot"></i>
+                        <span>Agent</span>
+                    </button>
+                    <div class="dropdown-content">
+                        <div class="dropdown-item selected" data-agent="default">
+                            <i class="fas fa-star"></i>
+                            Default Agent
+                        </div>
+                        <div class="dropdown-item" data-agent="code">
+                            <i class="fas fa-code"></i>
+                            Code Agent
+                        </div>
+                        <div class="dropdown-item" data-agent="debug">
+                            <i class="fas fa-bug"></i>
+                            Debug Agent
+                        </div>
+                        <div class="dropdown-item" data-agent="planning">
+                            <i class="fas fa-brain"></i>
+                            Planning Agent
+                        </div>
+                    </div>
+                </div>
+                
+                <button class="icon-btn" id="themeToggle" title="Toggle Theme">
+                    <i class="fas fa-moon"></i>
+                </button>
+                
+                <button class="icon-btn" id="settingsBtn" title="Settings">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- CHAT MESSAGES -->
+        <div class="chat-container scrollbar">
+            <div class="chat-messages" id="chatMessages">
+                <!-- Welcome message -->
+                <div class="message">
+                    <div class="message-avatar ai-avatar">AI</div>
+                    <div class="message-content">
+                        <div class="message-header">
+                            <div class="sender-name">ZombieCoder Assistant</div>
+                            <div class="message-time">Just now</div>
+                        </div>
+                        <div class="message-text">
+                            <p>Welcome to ZombieCoder v2.0! Ready to build something amazing?</p>
+                            <p>I'm now fully responsive and have enhanced features:</p>
+                            <ul>
+                                <li>Dark/Light theme support</li>
+                                <li>Multiple AI provider support (OpenAI, Anthropic, Ollama, Custom)</li>
+                                <li>Enhanced agent system with thinking/execution states</li>
+                                <li>Terminal permission management</li>
+                                <li>Mobile-friendly interface</li>
+                            </ul>
+                            <div class="prompt-suggestions">
+                                <div class="prompt-chip" onclick="insertPrompt(this)">Build a React component</div>
+                                <div class="prompt-chip" onclick="insertPrompt(this)">Fix this code error</div>
+                                <div class="prompt-chip" onclick="insertPrompt(this)">Create API endpoint</div>
+                                <div class="prompt-chip" onclick="insertPrompt(this)">Optimize performance</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CHAT INPUT -->
+            <div class="chat-input-area">
+                <div class="input-container">
+                    <textarea class="text-input" id="chatInput" placeholder="Describe what to build next..." rows="3"></textarea>
+                    <div class="input-toolbar">
+                        <div class="tool-left">
+                            <input type="file" id="fileUpload" accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.txt,.js,.ts,.py,.java,.html,.css" style="display: none;">
+                            <button class="attach-btn" onclick="document.getElementById('fileUpload').click()">
+                                <i class="fas fa-paperclip"></i>
+                                <span>Attach</span>
+                            </button>
+                            <div id="filePreview" class="hidden"></div>
+                        </div>
+                        <div class="tool-right">
+                            <select class="model-selector" id="modelSelect">
+                                <option value="gpt-4">GPT-4</option>
+                                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                <option value="claude-3">Claude 3</option>
+                                <option value="llama-3">Llama 3</option>
+                                <option value="custom">Custom Model</option>
+                            </select>
+                            <button class="send-btn" id="sendBtn">
+                                <i class="fas fa-paper-plane"></i>
+                                <span>Send</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STATUS BAR -->
+        <div class="status-bar">
+            <div class="status-left">
+                <div class="status-item">
+                    <div class="status-dot connected"></div>
+                    <span>Connected</span>
+                </div>
+                <div class="status-item">
+                    <span id="currentAgentStatus">Agent: Default</span>
+                </div>
+            </div>
+            <div>ZombieCoder v2.0 | <span id="currentModel">GPT-4</span></div>
+        </div>
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="settings-modal">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-cog"></i>
+                    Settings & Configuration
+                </div>
+                <button class="icon-btn" onclick="toggleSettings()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body scrollbar">
+                <div class="settings-section">
+                    <div class="section-title">AI Configuration</div>
+                    <div class="settings-grid">
+                        <div class="setting-item">
+                            <label class="setting-label">Model Provider</label>
+                            <select class="setting-input" id="providerSelect">
+                                <option value="openai">OpenAI</option>
+                                <option value="anthropic">Anthropic</option>
+                                <option value="ollama">Ollama</option>
+                                <option value="custom">Custom API</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">API Key</label>
+                            <input type="password" class="setting-input" id="apiKey" placeholder="Enter API key">
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">Base URL (OpenAI-Compatible)</label>
+                            <div class="api-url-container">
+                                <input type="text" class="setting-input api-url-input" id="apiBaseUrl" placeholder="http://127.0.0.1:8155/v1">
+                                <button class="test-api-btn" onclick="testApiConnection()">Test</button>
+                            </div>
+                            <small style="color: var(--text-dim); font-size: 11px;">For Ollama: http://localhost:11434/v1</small>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">Model</label>
+                            <select class="setting-input" id="modelConfig">
+                                <option value="gpt-4">GPT-4</option>
+                                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                <option value="claude-3-opus">Claude 3 Opus</option>
+                                <option value="llama-3-70b">Llama 3 70B</option>
+                                <option value="custom">Custom Model Name</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">Temperature: <span id="tempValue">0.7</span></label>
+                            <input type="range" class="setting-input" id="temperature" min="0" max="1" step="0.1" value="0.7">
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">Max Tokens</label>
+                            <input type="number" class="setting-input" id="maxTokens" value="2000">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <div class="section-title">Workspace</div>
+                    <div class="settings-grid">
+                        <div class="setting-item">
+                            <label class="setting-label">Indexing Port</label>
+                            <input type="number" class="setting-input" id="indexPort" value="3001">
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">Theme</label>
+                            <select class="setting-input" id="themeSelect">
+                                <option value="dark">Dark</option>
+                                <option value="light">Light</option>
+                                <option value="auto">System</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <input type="checkbox" class="setting-input" id="autoSave" checked style="width: auto; margin-right: 8px;">
+                                Auto-save conversations
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <input type="checkbox" class="setting-input" id="streaming" checked style="width: auto; margin-right: 8px;">
+                                Stream responses
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <input type="checkbox" class="setting-input" id="thinkingEnabled" checked style="width: auto; margin-right: 8px;">
+                                Show thinking process
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <input type="checkbox" class="setting-input" id="terminalPermission" checked style="width: auto; margin-right: 8px;">
+                                Ask for terminal permissions
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <div class="section-title">Extensions</div>
+                    <div class="setting-item">
+                        <label class="setting-label">Extension Directory</label>
+                        <input type="text" class="setting-input" id="extensionDir" placeholder="/path/to/extensions">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn secondary" onclick="toggleSettings()">Cancel</button>
+                <button class="modal-btn primary" onclick="saveSettings()">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let chatHistory = [];
+        let currentChatId = null;
+        let isStreaming = false;
+        let currentStream = null;
+        let selectedAgent = 'default';
+        let currentTheme = 'dark';
+        let settings = {};
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+            setupEventListeners();
+            loadSettings();
+            applyTheme();
+        });
+
+        function initializeApp() {
+            loadChatHistory();
+            if (chatHistory.length === 0) {
+                createNewChat();
+            } else {
+                switchToChat(chatHistory[chatHistory.length - 1].id);
+            }
+        }
+
+        function setupEventListeners() {
+            // Chat input
+            const chatInput = document.getElementById('chatInput');
+            const sendBtn = document.getElementById('sendBtn');
+            
+            chatInput.addEventListener('input', function() {
+                sendBtn.disabled = this.value.trim() === '' || isStreaming;
+            });
+
+            chatInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!sendBtn.disabled) {
+                        sendMessage();
+                    }
+                }
+            });
+
+            sendBtn.addEventListener('click', sendMessage);
+            
+            // Buttons
+            document.getElementById('newChatBtn').addEventListener('click', createNewChat);
+            document.getElementById('settingsBtn').addEventListener('click', toggleSettings);
+            document.getElementById('indexBtn').addEventListener('click', startIndexing);
+            document.getElementById('historyBtn').addEventListener('click', toggleHistoryView);
+            document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+            document.getElementById('clearHistoryBtn').addEventListener('click', clearHistory);
+            document.getElementById('refreshHistoryBtn').addEventListener('click', refreshHistory);
+            
+            // Mobile menu
+            document.getElementById('menuToggle').addEventListener('click', toggleSidebar);
+            document.getElementById('mobileMenuToggle').addEventListener('click', toggleSidebar);
+            document.getElementById('overlay').addEventListener('click', closeSidebar);
+
+            // File upload
+            document.getElementById('fileUpload').addEventListener('change', handleFileUpload);
+
+            // Agent selection
+            document.querySelectorAll('.dropdown-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    document.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('selected'));
+                    this.classList.add('selected');
+                    selectedAgent = this.dataset.agent;
+                    updateAgentStatus();
+                });
+            });
+
+            // Dropdown toggle
+            document.getElementById('agentBtn').addEventListener('click', function(e) {
+                e.stopPropagation();
+                document.getElementById('agentDropdown').classList.toggle('active');
+            });
+
+            // Close dropdowns when clicking outside
+            document.addEventListener('click', function() {
+                document.getElementById('agentDropdown').classList.remove('active');
+            });
+
+            // Temperature slider
+            document.getElementById('temperature').addEventListener('input', function() {
+                document.getElementById('tempValue').textContent = this.value;
+            });
+
+            // Provider selection
+            document.getElementById('providerSelect').addEventListener('change', function() {
+                updateModelOptions(this.value);
+            });
+
+            // Auto-resize textarea
+            chatInput.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = Math.min(this.scrollHeight, 300) + 'px';
+            });
+
+            // Model selector
+            document.getElementById('modelSelect').addEventListener('change', function() {
+                document.getElementById('currentModel').textContent = this.options[this.selectedIndex].text;
+            });
+        }
+
+        function updateModelOptions(provider) {
+            const modelSelect = document.getElementById('modelConfig');
+            const apiBaseUrl = document.getElementById('apiBaseUrl');
+            
+            switch(provider) {
+                case 'openai':
+                    modelSelect.innerHTML = `
+                        <option value="gpt-4">GPT-4</option>
+                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                        <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                    `;
+                    apiBaseUrl.placeholder = 'https://api.openai.com/v1';
+                    break;
+                case 'anthropic':
+                    modelSelect.innerHTML = `
+                        <option value="claude-3-opus">Claude 3 Opus</option>
+                        <option value="claude-3-sonnet">Claude 3 Sonnet</option>
+                        <option value="claude-3-haiku">Claude 3 Haiku</option>
+                    `;
+                    apiBaseUrl.placeholder = 'https://api.anthropic.com/v1';
+                    break;
+                case 'ollama':
+                    modelSelect.innerHTML = `
+                        <option value="llama-3-70b">Llama 3 70B</option>
+                        <option value="llama-3-8b">Llama 3 8B</option>
+                        <option value="mistral">Mistral</option>
+                        <option value="codellama">CodeLlama</option>
+                    `;
+                    apiBaseUrl.placeholder = 'http://localhost:11434/v1';
+                    break;
+                case 'custom':
+                    modelSelect.innerHTML = `
+                        <option value="custom">Custom Model Name</option>
+                    `;
+                    apiBaseUrl.placeholder = 'http://127.0.0.1:8155/v1';
+                    break;
+            }
+        }
+
+        function updateAgentStatus() {
+            const agentNames = {
+                'default': 'Default',
+                'code': 'Code',
+                'debug': 'Debug',
+                'planning': 'Planning'
+            };
+            document.getElementById('currentAgentStatus').textContent = `Agent: ${agentNames[selectedAgent]}`;
+        }
+
+        // Chat History Management
+        function loadChatHistory() {
+            const saved = localStorage.getItem('zombiecoder_chat_history');
+            if (saved) {
+                try {
+                    chatHistory = JSON.parse(saved);
+                } catch (e) {
+                    console.error('Error loading chat history:', e);
+                    chatHistory = [];
+                }
+            }
+        }
+
+        function saveChatHistory() {
+            localStorage.setItem('zombiecoder_chat_history', JSON.stringify(chatHistory));
+            updateHistoryList();
+        }
+
+        function createNewChat() {
+            const newChat = {
+                id: 'chat_' + Date.now(),
+                title: 'New Conversation',
+                messages: [],
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                agent: selectedAgent
+            };
+
+            chatHistory.push(newChat);
+            saveChatHistory();
+            switchToChat(newChat.id);
+            closeSidebar(); // Close sidebar on mobile
+        }
+
+        function switchToChat(chatId) {
+            currentChatId = chatId;
+            const chat = chatHistory.find(c => c.id === chatId);
+            
+            if (chat) {
+                document.getElementById('chatTitle').textContent = chat.title;
+                displayChatMessages(chat.messages);
+                selectedAgent = chat.agent || 'default';
+                updateAgentStatus();
+                updateHistoryList();
+            }
+            closeSidebar(); // Close sidebar on mobile
+        }
+
+        function updateHistoryList() {
+            const historyList = document.getElementById('historyList');
+            historyList.innerHTML = '';
+
+            const sortedHistory = [...chatHistory].sort((a, b) => 
+                new Date(b.updatedAt) - new Date(a.updatedAt)
+            );
+
+            sortedHistory.forEach(chat => {
+                const item = document.createElement('div');
+                item.className = `history-item ${chat.id === currentChatId ? 'active' : ''}`;
+                item.innerHTML = `
+                    <i class="fas fa-comment history-icon"></i>
+                    <span>${chat.title}</span>
+                    <button class="history-item-delete" onclick="deleteChat('${chat.id}', event)">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                
+                item.addEventListener('click', (e) => {
+                    if (!e.target.closest('.history-item-delete')) {
+                        switchToChat(chat.id);
+                    }
+                });
+                historyList.appendChild(item);
+            });
+        }
+
+        function deleteChat(chatId, event) {
+            event.stopPropagation();
+            if (confirm('Are you sure you want to delete this chat?')) {
+                chatHistory = chatHistory.filter(chat => chat.id !== chatId);
+                if (currentChatId === chatId && chatHistory.length > 0) {
+                    switchToChat(chatHistory[0].id);
+                } else if (chatHistory.length === 0) {
+                    createNewChat();
+                }
+                saveChatHistory();
+            }
+        }
+
+        function clearHistory() {
+            if (confirm('Are you sure you want to clear all chat history? This cannot be undone.')) {
+                chatHistory = [];
+                createNewChat();
+                saveChatHistory();
+            }
+        }
+
+        function refreshHistory() {
+            updateHistoryList();
+            showNotification('History refreshed', 'success');
+        }
+
+        // Message Handling
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message || isStreaming) return;
+
+            const chat = chatHistory.find(c => c.id === currentChatId);
+            if (!chat) return;
+
+            // Add user message
+            const userMessage = {
+                id: 'msg_' + Date.now(),
+                role: 'user',
+                content: message,
+                timestamp: new Date().toISOString(),
+                files: getAttachedFiles()
+            };
+
+            chat.messages.push(userMessage);
+            chat.updatedAt = new Date().toISOString();
+            chat.agent = selectedAgent;
+            
+            // Update title if first message
+            if (chat.messages.length === 1) {
+                chat.title = message.length > 30 ? message.substring(0, 30) + '...' : message;
+            }
+
+            displayChatMessages(chat.messages);
+            input.value = '';
+            document.getElementById('sendBtn').disabled = true;
+            input.style.height = 'auto';
+            clearAttachedFiles();
+
+            // Show typing indicator
+            showTypingIndicator();
+
+            // Simulate API call with streaming
+            await simulateStreamingResponse(chat, message);
+        }
+
+        function showTypingIndicator() {
+            const messagesContainer = document.getElementById('chatMessages');
+            const typingIndicator = document.createElement('div');
+            typingIndicator.className = 'message';
+            typingIndicator.innerHTML = `
+                <div class="message-avatar ai-avatar">AI</div>
+                <div class="message-content">
+                    <div class="message-header">
+                        <div class="sender-name">ZombieCoder Assistant</div>
+                        <div class="message-time">Just now</div>
+                    </div>
+                    <div class="typing-indicator">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                </div>
+            `;
+            typingIndicator.id = 'typing-indicator';
+            messagesContainer.appendChild(typingIndicator);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        async function simulateStreamingResponse(chat, userMessage) {
+            isStreaming = true;
+            
+            // Remove typing indicator
+            hideTypingIndicator();
+
+            // Create AI message element
+            const messagesContainer = document.getElementById('chatMessages');
+            const messageElement = document.createElement('div');
+            messageElement.className = 'message';
+            messageElement.innerHTML = `
+                <div class="message-avatar ai-avatar">AI</div>
+                <div class="message-content">
+                    <div class="message-header">
+                        <div class="sender-name">ZombieCoder Assistant <span class="agent-badge">${selectedAgent.toUpperCase()}</span></div>
+                        <div class="message-time">Just now</div>
+                    </div>
+                    <div class="message-text streaming-text" id="streaming-text"></div>
+                </div>
+            `;
+            messagesContainer.appendChild(messageElement);
+
+            const streamingText = document.getElementById('streaming-text');
+            const aiMessage = {
+                id: 'msg_' + Date.now(),
+                role: 'assistant',
+                content: '',
+                timestamp: new Date().toISOString(),
+                agent: selectedAgent
+            };
+
+            // Generate response based on agent and settings
+            const thinkingEnabled = document.getElementById('thinkingEnabled').checked;
+            const terminalPermissionEnabled = document.getElementById('terminalPermission').checked;
+            
+            await generateResponse(userMessage, selectedAgent, streamingText, aiMessage, chat, thinkingEnabled, terminalPermissionEnabled);
+        }
+
+        async function generateResponse(userMessage, agent, element, messageObj, chat, thinkingEnabled, terminalPermissionEnabled) {
+            let response = '';
+            
+            // Thinking phase
+            if (thinkingEnabled) {
+                response += generateThinkingPhase(userMessage, agent);
+                await streamText(response, element, messageObj);
+                await delay(800);
+            }
+            
+            // Execution phase
+            response += generateExecutionPhase(userMessage, agent);
+            await streamText('\n\n' + response.substring(messageObj.content.length), element, messageObj);
+            await delay(600);
+            
+            // Terminal permission if needed
+            if (terminalPermissionEnabled && needsTerminalPermission(userMessage)) {
+                response += generateTerminalPermissionRequest();
+                await streamText('\n\n' + response.substring(messageObj.content.length), element, messageObj);
+                await delay(1000);
+            }
+            
+            // Final response
+            response += generateFinalResponse(userMessage, agent);
+            await streamText('\n\n' + response.substring(messageObj.content.length), element, messageObj);
+            
+            // Save complete message
+            chat.messages.push(messageObj);
+            saveChatHistory();
+            isStreaming = false;
+            document.getElementById('sendBtn').disabled = false;
+        }
+
+        function generateThinkingPhase(userMessage, agent) {
+            return `
+                <div class="thinking-state">
+                    <div class="thinking-header">
+                        <i class="fas fa-brain"></i>
+                        THINKING PHASE - ${agent.toUpperCase()} AGENT
+                    </div>
+                    <p>Analyzing the request: <strong>"${userMessage}"</strong></p>
+                    <div class="planning-step completed">1. Parsing user requirements</div>
+                    <div class="planning-step completed">2. Contextual analysis</div>
+                    <div class="planning-step">3. Solution design</div>
+                    <div class="planning-step">4. Implementation planning</div>
+                </div>
+            `;
+        }
+
+        function generateExecutionPhase(userMessage, agent) {
+            return `
+                <div class="execution-state">
+                    <div class="execution-header">
+                        <i class="fas fa-cogs"></i>
+                        EXECUTION PHASE
+                    </div>
+                    <p>Executing solution for: <strong>"${userMessage}"</strong></p>
+                    <div class="planning-step completed">1. Planning complete</div>
+                    <div class="planning-step">2. Generating code</div>
+                    <div class="planning-step">3. Validating solution</div>
+                    <div class="planning-step">4. Preparing final output</div>
+                </div>
+            `;
+        }
+
+        function needsTerminalPermission(userMessage) {
+            const terminalKeywords = ['install', 'run', 'command', 'terminal', 'shell', 'bash', 'npm', 'yarn', 'docker', 'git'];
+            return terminalKeywords.some(keyword => userMessage.toLowerCase().includes(keyword));
+        }
+
+        function generateTerminalPermissionRequest() {
+            return `
+                <div class="terminal-permission">
+                    <div class="permission-header">
+                        <i class="fas fa-shield-alt"></i>
+                        TERMINAL PERMISSION REQUIRED
+                    </div>
+                    <p>This action requires terminal access to execute system commands.</p>
+                    <p><strong>Warning:</strong> Allowing terminal access gives the agent permission to run commands on your system.</p>
+                    <div class="permission-actions">
+                        <button class="permission-btn allow" onclick="allowTerminalAccess()">
+                            <i class="fas fa-check"></i> Allow Terminal Access
+                        </button>
+                        <button class="permission-btn deny" onclick="denyTerminalAccess()">
+                            <i class="fas fa-times"></i> Deny & Continue
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function generateFinalResponse(userMessage, agent) {
+            if (userMessage.toLowerCase().includes('build') || userMessage.toLowerCase().includes('create')) {
+                return `
+                    <h3>Implementation Ready</h3>
+                    <p>Here's the complete solution for your request:</p>
+                    
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">javascript</span>
+                            <div class="code-actions">
+                                <button class="code-btn" onclick="copyCode(this)">Copy</button>
+                                <button class="code-btn" onclick="executeCode(this)">Run</button>
+                            </div>
+                        </div>
+                        <pre class="code-content">// ${userMessage}
+class Solution {
+  constructor() {
+    this.initialized = true;
+    this.timestamp = new Date().toISOString();
+  }
+  
+  implement() {
+    // Core implementation logic
+    console.log("Feature successfully implemented");
+    return "Operation completed successfully";
+  }
+  
+  validate() {
+    // Validation logic
+    return this.initialized && this.timestamp;
+  }
+}
+
+// Export the module
+module.exports = Solution;</pre>
+                    </div>
+                    
+                    <div class="terminal-command">
+                        <span class="terminal-prompt">$</span> node solution.js
+                    </div>
+                    
+                    <p>Would you like me to explain any part of this implementation or modify it further?</p>
+                `;
+            } else if (userMessage.toLowerCase().includes('fix') || userMessage.toLowerCase().includes('error')) {
+                return `
+                    <h3>Debugging Complete</h3>
+                    <p>I've identified and fixed the issue:</p>
+                    
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">javascript</span>
+                            <div class="code-actions">
+                                <button class="code-btn" onclick="copyCode(this)">Copy</button>
+                            </div>
+                        </div>
+                        <pre class="code-content">// BEFORE: Error in original code
+function calculateTotal(items) {
+  let total = 0;
+  for (let i = 0; i <= items.length; i++) { // ERROR: Off-by-one
+    total += items[i].price;
+  }
+  return total;
+}
+
+// AFTER: Fixed code
+function calculateTotal(items) {
+  if (!items || items.length === 0) return 0;
+  
+  let total = 0;
+  for (let i = 0; i < items.length; i++) {
+    total += items[i].price || 0;
+  }
+  return total;
+}</pre>
+                    </div>
+                    
+                    <p><strong>Root Cause:</strong> Off-by-one error in loop condition</p>
+                    <p><strong>Solution:</strong> Changed <code>i <= items.length</code> to <code>i < items.length</code> and added null checks</p>
+                `;
+            } else {
+                return `
+                    <h3>Analysis Complete</h3>
+                    <p>I've analyzed your request and here are my findings:</p>
+                    
+                    <p><strong>Key Insights:</strong></p>
+                    <ul>
+                        <li>The approach should focus on maintainability and performance</li>
+                        <li>Modern best practices should be applied</li>
+                        <li>Error handling is crucial for robustness</li>
+                        <li>Consider scalability from the start</li>
+                    </ul>
+                    
+                    <p><strong>Recommendation:</strong></p>
+                    <p>Implement with a modular architecture using proven patterns. Let me know if you'd like me to generate specific code examples or dive deeper into any aspect!</p>
+                    
+                    <div class="terminal-command">
+                        <span class="terminal-prompt">$</span> # Next steps: Review the architecture and implement incrementally
+                    </div>
+                `;
+            }
+        }
+
+        async function streamText(text, element, messageObj) {
+            return new Promise(resolve => {
+                let index = 0;
+                const contentBefore = messageObj.content;
+                
+                currentStream = setInterval(() => {
+                    if (index < text.length) {
+                        const char = text.charAt(index);
+                        messageObj.content += char;
+                        
+                        // Format the content with HTML
+                        element.innerHTML = formatMessageContent(messageObj.content);
+                        
+                        index++;
+                        element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    } else {
+                        clearInterval(currentStream);
+                        element.classList.remove('streaming-text');
+                        resolve();
+                    }
+                }, 20);
+            });
+        }
+
+        function formatMessageContent(content) {
+            // Format code blocks
+            content = content.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+                const language = lang || 'text';
+                return `
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">${language}</span>
+                            <div class="code-actions">
+                                <button class="code-btn" onclick="copyCode(this)">Copy</button>
+                                <button class="code-btn" onclick="executeCode(this)" style="display: ${language === 'javascript' || language === 'python' ? 'block' : 'none'}">Run</button>
+                            </div>
+                        </div>
+                        <pre class="code-content">${escapeHtml(code.trim())}</pre>
+                    </div>
+                `;
+            });
+            
+            // Format inline code
+            content = content.replace(/`([^`]+)`/g, '<code>$1</code>');
+            
+            // Format terminal commands
+            content = content.replace(/\$ (.*)/g, '<div class="terminal-command"><span class="terminal-prompt">$</span> $1</div>');
+            
+            // Format headers
+            content = content.replace(/### (.*)/g, '<h4>$1</h4>');
+            content = content.replace(/## (.*)/g, '<h3>$1</h3>');
+            content = content.replace(/# (.*)/g, '<h2>$1</h2>');
+            
+            // Format lists
+            content = content.replace(/\* (.*)/g, '<li>$1</li>');
+            content = content.replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>');
+            
+            return content;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function hideTypingIndicator() {
+            const indicator = document.getElementById('typing-indicator');
+            if (indicator) {
+                indicator.remove();
+            }
+        }
+
+        function displayChatMessages(messages) {
+            const container = document.getElementById('chatMessages');
+            container.innerHTML = '';
+
+            // Add welcome message if empty
+            if (messages.length === 0) {
+                container.innerHTML = `
+                    <div class="message">
+                        <div class="message-avatar ai-avatar">AI</div>
+                        <div class="message-content">
+                            <div class="message-header">
+                                <div class="sender-name">ZombieCoder Assistant</div>
+                                <div class="message-time">Just now</div>
+                            </div>
+                            <div class="message-text">
+                                <p>Welcome to ZombieCoder v2.0! Ready to build something amazing?</p>
+                                <p>I'm now fully responsive and have enhanced features:</p>
+                                <ul>
+                                    <li>Dark/Light theme support</li>
+                                    <li>Multiple AI provider support (OpenAI, Anthropic, Ollama, Custom)</li>
+                                    <li>Enhanced agent system with thinking/execution states</li>
+                                    <li>Terminal permission management</li>
+                                    <li>Mobile-friendly interface</li>
+                                </ul>
+                                <div class="prompt-suggestions">
+                                    <div class="prompt-chip" onclick="insertPrompt(this)">Build a React component</div>
+                                    <div class="prompt-chip" onclick="insertPrompt(this)">Fix this code error</div>
+                                    <div class="prompt-chip" onclick="insertPrompt(this)">Create API endpoint</div>
+                                    <div class="prompt-chip" onclick="insertPrompt(this)">Optimize performance</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            messages.forEach(msg => {
+                const messageElement = document.createElement('div');
+                messageElement.className = 'message';
+                
+                const isAI = msg.role === 'assistant';
+                const avatarClass = isAI ? 'ai-avatar' : 'user-avatar';
+                const avatarText = isAI ? 'AI' : 'You';
+                const senderName = isAI ? 'ZombieCoder Assistant' : 'You';
+                
+                // Add agent badge for AI messages
+                const agentBadge = isAI && msg.agent ? `<span class="agent-badge">${msg.agent.toUpperCase()}</span>` : '';
+                
+                messageElement.innerHTML = `
+                    <div class="message-avatar ${avatarClass}">${avatarText}</div>
+                    <div class="message-content">
+                        <div class="message-header">
+                            <div class="sender-name">${senderName} ${agentBadge}</div>
+                            <div class="message-time">${formatTime(msg.timestamp)}</div>
+                        </div>
+                        <div class="message-text">${formatMessageContent(msg.content)}</div>
+                    </div>
+                `;
+                
+                container.appendChild(messageElement);
+            });
+
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function formatTime(timestamp) {
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diff = now - date;
+            
+            if (diff < 60000) return 'Just now';
+            if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+            if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+            
+            return date.toLocaleDateString();
+        }
+
+        // Utility Functions
+        function insertPrompt(chip) {
+            document.getElementById('chatInput').value = chip.textContent;
+            document.getElementById('chatInput').focus();
+            document.getElementById('sendBtn').disabled = false;
+        }
+
+        function copyCode(button) {
+            const codeContent = button.closest('.code-block').querySelector('.code-content').textContent;
+            navigator.clipboard.writeText(codeContent).then(() => {
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                button.style.color = 'var(--zombie-green)';
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.style.color = '';
+                }, 2000);
+            });
+        }
+
+        function executeCode(button) {
+            const codeBlock = button.closest('.code-block');
+            const language = codeBlock.querySelector('.code-language').textContent;
+            const codeContent = codeBlock.querySelector('.code-content').textContent;
+            
+            showNotification(`Running ${language} code... (Simulated)`, 'info');
+            
+            // In a real implementation, this would execute the code
+            // For now, we'll just show a success message
+            setTimeout(() => {
+                showNotification('Code executed successfully!', 'success');
+            }, 1500);
+        }
+
+        function allowTerminalAccess() {
+            showNotification('Terminal access granted for this session', 'success');
+            // In a real app, you would enable terminal execution here
+        }
+
+        function denyTerminalAccess() {
+            showNotification('Terminal access denied. Continuing without execution.', 'warning');
+            // In a real app, you would skip terminal commands
+        }
+
+        function showNotification(message, type) {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 12px 20px;
+                border-radius: 8px;
+                background: ${type === 'success' ? 'var(--zombie-green)' : type === 'error' ? 'var(--danger-red)' : 'var(--primary-blue)'};
+                color: white;
+                z-index: 10000;
+                font-size: 14px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                animation: slideIn 0.3s ease;
+            `;
+            
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+            
+            // Add CSS for animations
+            if (!document.getElementById('notification-styles')) {
+                const style = document.createElement('style');
+                style.id = 'notification-styles';
+                style.textContent = `
+                    @keyframes slideIn {
+                        from { transform: translateX(100%); opacity: 0; }
+                        to { transform: translateX(0); opacity: 1; }
+                    }
+                    @keyframes slideOut {
+                        from { transform: translateX(0); opacity: 1; }
+                        to { transform: translateX(100%); opacity: 0; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+        }
+
+        // File Handling
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const filePreview = document.getElementById('filePreview');
+                filePreview.innerHTML = `
+                    <div class="file-preview">
+                        <i class="fas fa-file"></i>
+                        ${file.name} (${formatFileSize(file.size)})
+                        <span class="close" onclick="clearAttachedFiles()">×</span>
+                    </div>
+                `;
+                filePreview.classList.remove('hidden');
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function getAttachedFiles() {
+            const fileInput = document.getElementById('fileUpload');
+            return fileInput.files;
+        }
+
+        function clearAttachedFiles() {
+            document.getElementById('fileUpload').value = '';
+            document.getElementById('filePreview').innerHTML = '';
+            document.getElementById('filePreview').classList.add('hidden');
+        }
+
+        // Theme Management
+        function toggleTheme() {
+            currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            document.body.setAttribute('data-theme', currentTheme);
+            localStorage.setItem('zombiecoder_theme', currentTheme);
+            
+            // Update theme toggle icon
+            const themeIcon = document.querySelector('#themeToggle i');
+            themeIcon.className = currentTheme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+            
+            showNotification(`${currentTheme === 'dark' ? 'Dark' : 'Light'} theme activated`, 'success');
+        }
+
+        function applyTheme() {
+            const savedTheme = localStorage.getItem('zombiecoder_theme') || 'dark';
+            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const themeSelect = document.getElementById('themeSelect');
+            
+            if (themeSelect.value === 'auto') {
+                currentTheme = systemPrefersDark ? 'dark' : 'light';
+            } else {
+                currentTheme = savedTheme;
+            }
+            
+            document.body.setAttribute('data-theme', currentTheme);
+            themeSelect.value = currentTheme;
+            
+            // Update theme toggle icon
+            const themeIcon = document.querySelector('#themeToggle i');
+            themeIcon.className = currentTheme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+        }
+
+        // Settings Management
+        function loadSettings() {
+            const saved = localStorage.getItem('zombiecoder_settings');
+            if (saved) {
+                try {
+                    settings = JSON.parse(saved);
+                    
+                    // Apply settings to form
+                    if (settings.provider) document.getElementById('providerSelect').value = settings.provider;
+                    if (settings.apiKey) document.getElementById('apiKey').value = settings.apiKey;
+                    if (settings.apiBaseUrl) document.getElementById('apiBaseUrl').value = settings.apiBaseUrl;
+                    if (settings.model) document.getElementById('modelConfig').value = settings.model;
+                    if (settings.temperature) {
+                        document.getElementById('temperature').value = settings.temperature;
+                        document.getElementById('tempValue').textContent = settings.temperature;
+                    }
+                    if (settings.maxTokens) document.getElementById('maxTokens').value = settings.maxTokens;
+                    if (settings.indexPort) document.getElementById('indexPort').value = settings.indexPort;
+                    if (settings.theme) {
+                        document.getElementById('themeSelect').value = settings.theme;
+                        currentTheme = settings.theme === 'auto' ? 
+                            (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : 
+                            settings.theme;
+                        document.body.setAttribute('data-theme', currentTheme);
+                    }
+                    if (settings.autoSave !== undefined) document.getElementById('autoSave').checked = settings.autoSave;
+                    if (settings.streaming !== undefined) document.getElementById('streaming').checked = settings.streaming;
+                    if (settings.thinkingEnabled !== undefined) document.getElementById('thinkingEnabled').checked = settings.thinkingEnabled;
+                    if (settings.terminalPermission !== undefined) document.getElementById('terminalPermission').checked = settings.terminalPermission;
+                    if (settings.extensionDir) document.getElementById('extensionDir').value = settings.extensionDir;
+                    
+                    // Update model options based on provider
+                    updateModelOptions(settings.provider || 'openai');
+                    
+                } catch (e) {
+                    console.error('Error loading settings:', e);
+                }
+            }
+        }
+
+        function toggleSettings() {
+            document.getElementById('settingsModal').classList.toggle('active');
+        }
+
+        function saveSettings() {
+            // Save settings to localStorage
+            settings = {
+                provider: document.getElementById('providerSelect').value,
+                apiKey: document.getElementById('apiKey').value,
+                apiBaseUrl: document.getElementById('apiBaseUrl').value,
+                model: document.getElementById('modelConfig').value,
+                temperature: document.getElementById('temperature').value,
+                maxTokens: document.getElementById('maxTokens').value,
+                indexPort: document.getElementById('indexPort').value,
+                theme: document.getElementById('themeSelect').value,
+                autoSave: document.getElementById('autoSave').checked,
+                streaming: document.getElementById('streaming').checked,
+                thinkingEnabled: document.getElementById('thinkingEnabled').checked,
+                terminalPermission: document.getElementById('terminalPermission').checked,
+                extensionDir: document.getElementById('extensionDir').value
+            };
+            
+            localStorage.setItem('zombiecoder_settings', JSON.stringify(settings));
+            
+            // Apply theme if changed
+            if (settings.theme === 'auto') {
+                currentTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            } else {
+                currentTheme = settings.theme;
+            }
+            document.body.setAttribute('data-theme', currentTheme);
+            
+            toggleSettings();
+            showNotification('Settings saved successfully!', 'success');
+        }
+
+        function testApiConnection() {
+            const provider = document.getElementById('providerSelect').value;
+            const apiKey = document.getElementById('apiKey').value;
+            const baseUrl = document.getElementById('apiBaseUrl').value;
+            
+            if (!baseUrl) {
+                showNotification('Please enter a base URL', 'error');
+                return;
+            }
+            
+            showNotification(`Testing connection to ${baseUrl}...`, 'info');
+            
+            // Simulate API test
+            setTimeout(() => {
+                showNotification('Connection successful! API endpoint is reachable.', 'success');
+            }, 1500);
+        }
+
+        // Indexing Functionality
+        function startIndexing() {
+            const indexBtn = document.getElementById('indexBtn');
+            const originalText = indexBtn.innerHTML;
+            
+            indexBtn.innerHTML = `
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>Indexing...</span>
+            `;
+            indexBtn.disabled = true;
+            
+            // Simulate indexing progress
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += 10;
+                if (progress >= 100) {
+                    clearInterval(progressInterval);
+                    indexBtn.innerHTML = originalText;
+                    indexBtn.disabled = false;
+                    
+                    // Show indexing completed message
+                    const chat = chatHistory.find(c => c.id === currentChatId);
+                    if (chat) {
+                        const systemMessage = {
+                            id: 'sys_' + Date.now(),
+                            role: 'system',
+                            content: 'Codebase indexing completed successfully. All files are now available for context.',
+                            timestamp: new Date().toISOString()
+                        };
+                        
+                        chat.messages.push(systemMessage);
+                        saveChatHistory();
+                        displayChatMessages(chat.messages);
+                    }
+                    
+                    showNotification('Codebase indexed successfully!', 'success');
+                }
+            }, 200);
+        }
+
+        function toggleHistoryView() {
+            // In a full implementation, this would show a dedicated history view
+            showNotification('History view would open here in a full implementation', 'info');
+        }
+
+        // Sidebar Management (Mobile)
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('active');
+            document.getElementById('overlay').classList.toggle('active');
+        }
+
+        function closeSidebar() {
+            document.getElementById('sidebar').classList.remove('active');
+            document.getElementById('overlay').classList.remove('active');
+        }
+
+        // Helper functions
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Initialize model options
+        updateModelOptions('openai');
+        updateAgentStatus();
+        
+        // Terminal initialization
+        const term = new Terminal({
+            cursorBlink: true,
+            fontSize: 13,
+            theme: { background: '#0f1117' }
+        });
+        term.open(document.getElementById('terminal-container'));
+        term.write('\x1b[32msahon@zombie-dance\x1b[0m:~$ ');
+
+        // Permission tracker
+        function askPermission(command) {
+            document.getElementById('permDesc').innerText = `Allow agent to execute: ${command}?`;
+            document.getElementById('permissionModal').classList.add('active');
+        }
+
+        function grantPerm() {
+            document.getElementById('permissionModal').classList.remove('active');
+            term.write('\r\n\x1b[33mExecuting command...\x1b[0m\r\n');
+            // Your original command run logic here
+        }
+
+        function closePerm() {
+            document.getElementById('permissionModal').classList.remove('active');
+        }
+        
+        // Enhanced terminal effect - simulate floating text when commands are executed
+        function executeCommandWithEffect(command) {
+            // Show the command in the terminal with a floating effect
+            term.write(`\r\n\x1b[32m${command}\x1b[0m\r\n`);
+            
+            // Simulate command processing with floating effect
+            setTimeout(() => {
+                term.write('\x1b[33mProcessing...\x1b[0m\r\n');
+                
+                // Simulate command output with floating animation effect
+                setTimeout(() => {
+                    term.write('\x1b[36mCommand executed successfully!\x1b[0m\r\n');
+                    term.write('\x1b[32msahon@zombie-dance\x1b[0m:~$ ');
+                }, 800);
+            }, 500);
+        }
+        
+        // Override the default terminal write method to add floating effect
+        const originalWrite = term.write;
+        term.write = function(data) {
+            // Add a slight delay to simulate the floating text effect
+            setTimeout(() => {
+                originalWrite.call(term, data);
+            }, 0);
+        };
+    </script>
+    <!-- Xterm JS -->
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.1.0/lib/xterm.js"></script>
+</body>
+</html>

@@ -14,12 +14,14 @@ export default function EditorIntegrationPage() {
   const [action, setAction] = useState<"open" | "save" | "insert">("open")
   const [sending, setSending] = useState(false)
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [connectionStatus, setConnectionStatus] = useState<"Connected" | "Not Connected">("Not Connected")
 
   const handleSend = async () => {
     if (!filePath.trim()) return
 
     setSending(true)
     setResult(null)
+    setConnectionStatus("Not Connected")
 
     try {
       const response = await fetch("/api/proxy/editor/send", {
@@ -34,6 +36,7 @@ export default function EditorIntegrationPage() {
 
       if (response.ok) {
         const data = await response.json()
+        setConnectionStatus("Connected")
         setResult({
           success: true,
           message: data.message || "Successfully sent to VS Code",
@@ -192,11 +195,13 @@ export default function EditorIntegrationPage() {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">VS Code API</span>
-                <span className="font-mono text-xs">localhost:3001</span>
+                <span className="font-mono text-xs">localhost:8000</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Status</span>
-                <span className="text-warning">Not Connected</span>
+                <span className={`font-medium ${connectionStatus === "Connected" ? "text-success" : "text-warning"}`}>
+                  {connectionStatus}
+                </span>
               </div>
             </div>
             <p className="mt-4 text-xs text-muted-foreground">

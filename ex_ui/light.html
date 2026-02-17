@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Sidebar Design</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            display: flex;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            color: #fff;
+        }
+
+        /* Sidebar Styles */
+        .sidebar {
+            width: 260px;
+            background: rgba(25, 25, 35, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 5px 0 15px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .logo {
+            padding: 0 20px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .logo h1 {
+            font-size: 1.5rem;
+            color: #4CAF50;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-icon {
+            font-size: 1.8rem;
+        }
+
+        .nav-links {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .nav-item {
+            padding: 12px 20px;
+            color: #b0b0b0;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-left: 3px solid transparent;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .nav-item:hover {
+            background: rgba(76, 175, 80, 0.1);
+            color: #fff;
+            border-left: 3px solid #4CAF50;
+        }
+
+        .nav-item.active {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4CAF50;
+            border-left: 3px solid #4CAF50;
+        }
+
+        .nav-item i {
+            font-size: 1.2rem;
+            width: 24px;
+            text-align: center;
+        }
+
+        /* Main Content Styles */
+        .main-content {
+            flex: 1;
+            padding: 30px;
+            background: rgba(15, 15, 25, 0.8);
+            backdrop-filter: blur(10px);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .header h2 {
+            font-size: 1.8rem;
+            color: #4CAF50;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #4CAF50, #8BC34A);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .dashboard-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(30, 30, 40, 0.7);
+            border-radius: 10px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            color: #FFC107;
+        }
+
+        .card-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+
+        .card-footer {
+            margin-top: 15px;
+            font-size: 0.9rem;
+            color: #b0b0b0;
+        }
+
+        .settings-panel {
+            background: rgba(30, 30, 40, 0.7);
+            border-radius: 10px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .settings-title {
+            font-size: 1.5rem;
+            color: #4CAF50;
+            margin-bottom: 20px;
+        }
+
+        .setting-group {
+            margin-bottom: 25px;
+        }
+
+        .setting-label {
+            display: block;
+            margin-bottom: 8px;
+            color: #FFC107;
+        }
+
+        .setting-control {
+            width: 100%;
+            padding: 10px 15px;
+            background: rgba(20, 20, 30, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            color: #fff;
+            font-size: 1rem;
+        }
+
+        .btn {
+            padding: 12px 25px;
+            background: linear-gradient(45deg, #4CAF50, #8BC34A);
+            border: none;
+            border-radius: 5px;
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            background: rgba(20, 20, 30, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            color: #fff;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="logo">
+            <h1><span class="logo-icon">🤖</span> ZombieCoder</h1>
+        </div>
+        
+        <div class="nav-links">
+            <div class="nav-item active">
+                <span>🏠</span>
+                <span>Dashboard</span>
+            </div>
+            <div class="nav-item">
+                <span>⚙️</span>
+                <span>Settings</span>
+            </div>
+            <div class="nav-item">
+                <span>💬</span>
+                <span>AI Chat</span>
+            </div>
+            <div class="nav-item">
+                <span>📁</span>
+                <span>Explorer</span>
+            </div>
+            <div class="nav-item">
+                <span>📝</span>
+                <span>Editor</span>
+            </div>
+            <div class="nav-item">
+                <span>🔌</span>
+                <span>Extensions</span>
+            </div>
+            <div class="nav-item">
+                <span>🔒</span>
+                <span>Security</span>
+            </div>
+            <div class="nav-item">
+                <span>👤</span>
+                <span>Account</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="header">
+            <h2>Dashboard Overview</h2>
+            <div class="user-info">
+                <span>Welcome, Developer!</span>
+                <div class="user-avatar">U</div>
+            </div>
+        </div>
+
+        <div class="dashboard-cards">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Projects</div>
+                    <div>📊</div>
+                </div>
+                <div class="card-value">12</div>
+                <div class="card-footer">Active projects</div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Files</div>
+                    <div>📄</div>
+                </div>
+                <div class="card-value">142</div>
+                <div class="card-footer">Total files managed</div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">AI Chats</div>
+                    <div>💬</div>
+                </div>
+                <div class="card-value">24</div>
+                <div class="card-footer">Today's interactions</div>
+            </div>
+        </div>
+
+        <div class="settings-panel">
+            <h3 class="settings-title">System Settings</h3>
+            
+            <div class="setting-group">
+                <label class="setting-label">Theme</label>
+                <select class="setting-control">
+                    <option>Dark Mode</option>
+                    <option>Light Mode</option>
+                    <option>Blue Theme</option>
+                    <option>Green Theme</option>
+                </select>
+            </div>
+            
+            <div class="setting-group">
+                <label class="setting-label">Font Size</label>
+                <input type="range" class="setting-control" min="12" max="24" value="14">
+            </div>
+            
+            <div class="setting-group">
+                <label class="setting-label">Auto Save</label>
+                <input type="checkbox" checked> Enable auto save
+            </div>
+            
+            <button class="btn">Save Settings</button>
+        </div>
+    </div>
+
+    <button class="theme-toggle">🌙 Dark</button>
+
+    <script>
+        // Simple interactivity
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', function() {
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
+        // Theme toggle
+        const themeToggle = document.querySelector('.theme-toggle');
+        themeToggle.addEventListener('click', function() {
+            document.body.classList.toggle('light-theme');
+            this.textContent = document.body.classList.contains('light-theme') ? '☀️ Light' : '🌙 Dark';
+        });
+    </script>
+</body>
+</html>
