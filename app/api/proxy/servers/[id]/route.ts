@@ -6,7 +6,7 @@ export async function GET(
 ) {
   const uasApiUrl = process.env.UAS_API_URL;
   const uasApiKey = process.env.UAS_API_KEY;
-  
+
   if (!uasApiUrl) {
     return NextResponse.json({ error: "UAS_API_URL not configured" }, { status: 503 });
   }
@@ -15,7 +15,7 @@ export async function GET(
     const { id } = await params;
     const response = await fetch(`${uasApiUrl}/servers/${id}`, {
       headers: {
-        ...(uasApiKey && { Authorization: `Bearer ${uasApiKey}` }),
+        ...(uasApiKey && { "X-API-Key": uasApiKey }),
       },
       cache: "no-store",
     });
@@ -38,7 +38,7 @@ export async function PUT(
 ) {
   const uasApiUrl = process.env.UAS_API_URL;
   const uasApiKey = process.env.UAS_API_KEY;
-  
+
   if (!uasApiUrl) {
     return NextResponse.json({ error: "UAS_API_URL not configured" }, { status: 503 });
   }
@@ -46,12 +46,12 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    
+
     const response = await fetch(`${uasApiUrl}/servers/${id}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-        ...(uasApiKey && { Authorization: `Bearer ${uasApiKey}` }),
+        ...(uasApiKey && { "X-API-Key": uasApiKey }),
       },
       body: JSON.stringify(body),
     });
@@ -78,18 +78,18 @@ export async function DELETE(
 ) {
   const uasApiUrl = process.env.UAS_API_URL;
   const uasApiKey = process.env.UAS_API_KEY;
-  
+
   if (!uasApiUrl) {
     return NextResponse.json({ error: "UAS_API_URL not configured" }, { status: 503 });
   }
 
   try {
     const { id } = await params;
-    
+
     const response = await fetch(`${uasApiUrl}/servers/${id}`, {
       method: "DELETE",
       headers: {
-        ...(uasApiKey && { Authorization: `Bearer ${uasApiKey}` }),
+        ...(uasApiKey && { "X-API-Key": uasApiKey }),
       },
     });
 

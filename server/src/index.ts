@@ -15,17 +15,26 @@ import statusRoutes from './routes/status';
 import chatRoutes from './routes/chat';
 import modelsRoutes from './routes/models';
 import agentsRoutes from './routes/agents';
-import memoryRoutes from './routes/memory';
+import memoryRoutes from './routes/memory-new';
 import cliRoutes from './routes/cli';
 import editorRoutes from './routes/editor';
 import providersRoutes from './routes/providers';
 import serversRoutes from './routes/servers';
+import settingsRoutes from './routes/settings';
+import metricsRoutes from './routes/metrics';
+import promptTemplatesRoutes from './routes/prompt-templates';
+import { initializeMemoryRoutes } from './routes/memory-new';
+import { initializeCLIRoutes } from './routes/cli-new';
+
+import { apiAuditMiddleware } from './middleware/apiAudit';
 
 // Import services
 import { OllamaService } from './services/ollama';
 import { WebSocketService } from './services/websocket';
 import { Logger } from './utils/logger';
 import { initializeDatabase } from './database/connection';
+import { MemoryService } from './services/memory';
+import { EmbeddingService } from './services/embedding';
 
 const app = express();
 const server = createServer(app);
@@ -34,6 +43,8 @@ const port = process.env.PORT || 8000;
 // Initialize services
 const ollamaService = new OllamaService();
 const logger = new Logger();
+const memoryService = new MemoryService();
+const embeddingService = new EmbeddingService(ollamaService, memoryService);
 
 // WebSocket setup
 const wss = new WebSocketServer({ server });
@@ -41,12 +52,19 @@ const wsService = new WebSocketService(wss);
 
 // Middleware
 app.use(helmet());
+app.use((req, res, next) => {
+    res.setHeader('X-Powered-By', 'ZombieCoder-by-SahonSrabon');
+    next();
+});
 app.use(cors({
     origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
     credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// API audit logging (DB)
+app.use(apiAuditMiddleware);
 
 // Request logging
 app.use((req, res, next) => {
@@ -68,6 +86,9 @@ app.use('/cli-agent', cliRoutes);
 app.use('/editor', editorRoutes);
 app.use('/providers', providersRoutes);
 app.use('/servers', serversRoutes);
+app.use('/settings', settingsRoutes);
+app.use('/metrics', metricsRoutes);
+app.use('/prompt-templates', promptTemplatesRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -82,7 +103,7 @@ app.get('/', (req, res) => {
             chat: '/chat',
             models: '/models',
             agents: '/agents',
-            memory: '/memory',
+            memory: '/memory-new',
             cli: '/cli-agent',
             editor: '/editor',
             providers: '/providers',
@@ -113,7 +134,7 @@ server.listen(port, async () => {
     logger.info(`🚀 UAS TypeScript Server running on port ${port}`);
     logger.info(`📡 WebSocket server ready for real-time updates`);
     logger.info(`🔗 Ollama integration: ${ollamaService.isConnected ? 'Connected' : 'Disconnected'}`);
-    
+
     // Initialize database
     try {
         await initializeDatabase({
@@ -128,6 +149,16 @@ server.listen(port, async () => {
         logger.info('✅ Database connected successfully');
     } catch (error) {
         logger.warn('⚠️ Database connection failed - running in offline mode', error);
+    }
+
+    // Initialize memory service
+    try {
+        await memoryService.initialize();
+        initializeMemoryRoutes(memoryService, embeddingService, ollamaService);
+        initializeCLIRoutes();
+        logger.info('✅ Memory service initialized successfully');
+    } catch (error) {
+        logger.error('❌ Failed to initialize memory service:', error);
     }
 
     // Test Ollama connection

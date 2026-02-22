@@ -4,6 +4,9 @@ import { useEffect, useState } from "react"
 import { Bot, Loader2, Terminal, RefreshCw, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
 
 interface Agent {
   id: string
@@ -12,6 +15,8 @@ interface Agent {
   host?: string
   port?: number
   type?: string
+  persona_name?: string | null
+  system_prompt?: string | null
   config?: any
   requestCount?: number
   activeSessions?: number
@@ -35,6 +40,11 @@ export default function AgentsPage() {
   const [command, setCommand] = useState("")
   const [sending, setSending] = useState(false)
 
+  const [personaDialogOpen, setPersonaDialogOpen] = useState(false)
+  const [personaName, setPersonaName] = useState("")
+  const [systemPrompt, setSystemPrompt] = useState("")
+  const [savingPersona, setSavingPersona] = useState(false)
+
   const fetchAgents = async () => {
     try {
       const response = await fetch("/api/proxy/agents")
@@ -47,6 +57,8 @@ export default function AgentsPage() {
             name: agent.name,
             status: agent.status,
             type: agent.type,
+            persona_name: agent.persona_name ?? null,
+            system_prompt: agent.system_prompt ?? null,
             host: agent.endpoint || agent.host,
             config: agent.config || agent.configuration,
             requestCount: agent.requestCount || agent.request_count,
@@ -65,6 +77,8 @@ export default function AgentsPage() {
             name: agent.name,
             status: agent.status,
             type: agent.type,
+            persona_name: agent.persona_name ?? null,
+            system_prompt: agent.system_prompt ?? null,
             host: agent.endpoint || agent.host,
             config: agent.config || agent.configuration,
             requestCount: agent.requestCount || agent.request_count,
@@ -88,6 +102,40 @@ export default function AgentsPage() {
     } finally {
       setLoading(false)
       setRefreshing(false)
+    }
+  }
+
+  const selected = selectedAgent ? agents.find((a) => a.id === selectedAgent) : null
+  const isDbAgent = Boolean(selected && !Number.isNaN(Number(selected.id)))
+
+  const openPersonaEditor = () => {
+    if (!selected) return
+    setPersonaName(selected.persona_name || "")
+    setSystemPrompt(selected.system_prompt || "")
+    setPersonaDialogOpen(true)
+  }
+
+  const savePersona = async () => {
+    if (!selected || !isDbAgent) return
+    setSavingPersona(true)
+    try {
+      const res = await fetch(`/api/proxy/settings/agents/${selected.id}/persona`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          persona_name: personaName,
+          system_prompt: systemPrompt,
+        }),
+      })
+
+      if (res.ok) {
+        setPersonaDialogOpen(false)
+        await fetchAgents()
+      }
+    } catch (error) {
+      console.log("[v0] Failed to save persona:", error)
+    } finally {
+      setSavingPersona(false)
     }
   }
 
@@ -172,9 +220,8 @@ export default function AgentsPage() {
               {agents.map((agent) => (
                 <div
                   key={agent.id}
-                  className={`cursor-pointer rounded-lg border bg-card p-6 transition-colors ${
-                    selectedAgent === agent.id ? "border-primary" : "border-border hover:border-primary/50"
-                  }`}
+                  className={`cursor-pointer rounded-lg border bg-card p-6 transition-colors ${selectedAgent === agent.id ? "border-primary" : "border-border hover:border-primary/50"
+                    }`}
                   onClick={() => setSelectedAgent(agent.id)}
                 >
                   <div className="flex items-start justify-between">
@@ -232,6 +279,54 @@ export default function AgentsPage() {
                 <div className="rounded-md bg-muted p-3">
                   <p className="text-sm text-muted-foreground">Selected Agent</p>
                   <p className="mt-1 font-medium">{agents.find((a) => a.id === selectedAgent)?.name}</p>
+                </div>
+
+                <div className="flex justify-end">
+                  <Dialog open={personaDialogOpen} onOpenChange={setPersonaDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="bg-transparent" onClick={openPersonaEditor} disabled={!isDbAgent}>
+                        Edit Persona
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle>Edit Persona</DialogTitle>
+                      </DialogHeader>
+
+                      {!isDbAgent ? (
+                        <div className="text-sm text-muted-foreground">Persona editing is available for database agents only.</div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>Persona Name</Label>
+                            <Input value={personaName} onChange={(e) => setPersonaName(e.target.value)} placeholder="Persona name" />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>System Prompt</Label>
+                            <Textarea
+                              value={systemPrompt}
+                              onChange={(e) => setSystemPrompt(e.target.value)}
+                              rows={10}
+                              placeholder="Enter system prompt..."
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Identity + ethical guardrails will be automatically applied on save.
+                            </p>
+                          </div>
+
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" className="bg-transparent" onClick={() => setPersonaDialogOpen(false)}>
+                              Cancel
+                            </Button>
+                            <Button onClick={savePersona} disabled={savingPersona}>
+                              {savingPersona ? "Saving..." : "Save"}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </DialogContent>
+                  </Dialog>
                 </div>
 
                 <div className="flex gap-2">

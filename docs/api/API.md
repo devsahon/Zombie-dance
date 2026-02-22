@@ -23,18 +23,33 @@ Complete API reference for the UAS Admin Panel.
 
 ## Authentication
 
-All API requests require authentication using an API key.
+Authentication uses an API key header for sensitive write operations.
+
+- Most `GET` routes are public (read-only).
+- Admin/settings writes and prompt template writes require `X-API-Key`.
 
 ### Headers
 
-\`\`\`http
+```http
 X-API-Key: your_api_key_here
 Content-Type: application/json
-\`\`\`
+```
+
+Protected examples:
+
+- `PUT /settings/default-model`
+- `PUT /settings/agents/:agentId/persona`
+- `POST|PUT|DELETE /prompt-templates`
+
+Public examples:
+
+- `GET /settings/default-model`
+- `GET /metrics/summary?range=today|7d|30d`
+- `GET /metrics/agents?range=today|7d|30d`
 
 ### Error Responses
 
-\`\`\`json
+```json
 {
   "error": "Unauthorized",
   "message": "Invalid or missing API key"

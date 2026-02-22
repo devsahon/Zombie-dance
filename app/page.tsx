@@ -1,6 +1,7 @@
 import { ServerHealthCard } from "@/components/server-health-card"
 import { SystemStatusCard } from "@/components/system-status-card"
 import { QuickActionsCard } from "@/components/quick-actions-card"
+import { MetricsCards } from "@/components/metrics-cards"
 
 export default function DashboardPage() {
   return (
@@ -14,6 +15,10 @@ export default function DashboardPage() {
         <ServerHealthCard />
         <SystemStatusCard />
         <QuickActionsCard />
+      </div>
+
+      <div className="mt-8">
+        <MetricsCards />
       </div>
     </div>
   )

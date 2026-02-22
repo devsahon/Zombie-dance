@@ -5,6 +5,7 @@ import { SettingsIcon, Eye, EyeOff, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface EnvVariable {
   key: string
@@ -12,13 +13,23 @@ interface EnvVariable {
   isSecret: boolean
 }
 
+interface DefaultModelResponse {
+  success?: boolean
+  defaultModel?: string | null
+}
+
 export default function SettingsPage() {
   const [envVars, setEnvVars] = useState<EnvVariable[]>([])
   const [showSecrets, setShowSecrets] = useState(false)
   const [loading, setLoading] = useState(true)
 
+  const [models, setModels] = useState<string[]>([])
+  const [defaultModel, setDefaultModel] = useState<string>("")
+  const [savingDefaultModel, setSavingDefaultModel] = useState(false)
+
   useEffect(() => {
     fetchEnvVars()
+    fetchModelsAndDefaultModel()
   }, [])
 
   const fetchEnvVars = async () => {
@@ -33,6 +44,51 @@ export default function SettingsPage() {
       console.log("[v0] Failed to fetch env vars:", error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchModelsAndDefaultModel = async () => {
+    try {
+      const [modelsRes, defaultRes] = await Promise.all([
+        fetch("/api/proxy/models"),
+        fetch("/api/proxy/settings/default-model"),
+      ])
+
+      if (modelsRes.ok) {
+        const data = await modelsRes.json()
+        const list = Array.isArray(data?.data) ? data.data : []
+        const names = list
+          .map((m: any) => String(m?.model_name || m?.name || "").trim())
+          .filter((s: string) => Boolean(s))
+        setModels(Array.from(new Set(names)))
+      }
+
+      if (defaultRes.ok) {
+        const d = (await defaultRes.json()) as DefaultModelResponse
+        setDefaultModel(typeof d?.defaultModel === "string" ? d.defaultModel : "")
+      }
+    } catch (error) {
+      console.log("[v0] Failed to fetch models/default model:", error)
+    }
+  }
+
+  const handleSaveDefaultModel = async () => {
+    if (!defaultModel.trim()) return
+    setSavingDefaultModel(true)
+    try {
+      const res = await fetch("/api/proxy/settings/default-model", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: defaultModel }),
+      })
+
+      if (res.ok) {
+        await fetchModelsAndDefaultModel()
+      }
+    } catch (error) {
+      console.log("[v0] Failed to save default model:", error)
+    } finally {
+      setSavingDefaultModel(false)
     }
   }
 
@@ -56,6 +112,41 @@ export default function SettingsPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
+          <div className="mb-6 rounded-lg border border-border bg-card p-6">
+            <div className="mb-4">
+              <h3 className="font-medium">Default Model</h3>
+              <p className="mt-1 text-sm text-muted-foreground">Used when an agent does not specify a model.</p>
+            </div>
+
+            <div className="grid gap-3">
+              <Label>Model</Label>
+              <Select value={defaultModel} onValueChange={setDefaultModel}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {models.length === 0 ? (
+                    <SelectItem value="__no_models__" disabled>
+                      No models
+                    </SelectItem>
+                  ) : (
+                    models.map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {m}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+
+              <div className="flex justify-end">
+                <Button onClick={handleSaveDefaultModel} disabled={!defaultModel.trim() || savingDefaultModel}>
+                  {savingDefaultModel ? "Saving..." : "Save"}
+                </Button>
+              </div>
+            </div>
+          </div>
+
           <div className="rounded-lg border border-border bg-card p-6">
             <div className="mb-6 flex items-center justify-between">
               <div className="flex items-center gap-2">

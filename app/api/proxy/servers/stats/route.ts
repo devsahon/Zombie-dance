@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 export async function GET() {
   const uasApiUrl = process.env.UAS_API_URL;
   const uasApiKey = process.env.UAS_API_KEY;
-  
+
   if (!uasApiUrl) {
     return NextResponse.json({ error: "UAS_API_URL not configured" }, { status: 503 });
   }
@@ -11,7 +11,7 @@ export async function GET() {
   try {
     const response = await fetch(`${uasApiUrl}/servers/stats/summary`, {
       headers: {
-        ...(uasApiKey && { Authorization: `Bearer ${uasApiKey}` }),
+        ...(uasApiKey && { "X-API-Key": uasApiKey }),
       },
       cache: "no-store",
     });

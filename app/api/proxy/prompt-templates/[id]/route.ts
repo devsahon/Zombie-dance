@@ -16,7 +16,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-        ...(uasApiKey && { Authorization: `Bearer ${uasApiKey}` }),
+        ...(uasApiKey && { "X-API-Key": uasApiKey }),
       },
       body: JSON.stringify(body),
     })
@@ -46,7 +46,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const response = await fetch(`${uasApiUrl}/prompt-templates/${id}`, {
       method: "DELETE",
       headers: {
-        ...(uasApiKey && { Authorization: `Bearer ${uasApiKey}` }),
+        ...(uasApiKey && { "X-API-Key": uasApiKey }),
       },
     })
 

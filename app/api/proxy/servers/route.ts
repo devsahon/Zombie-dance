@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     const response = await fetch(apiUrl, {
       headers: {
         "Content-Type": "application/json",
-        ...(uasApiKey && { Authorization: `Bearer ${uasApiKey}` }),
+        ...(uasApiKey && { "X-API-Key": uasApiKey }),
       },
       cache: "no-store",
     });
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(uasApiKey && { Authorization: `Bearer ${uasApiKey}` }),
+        ...(uasApiKey && { "X-API-Key": uasApiKey }),
       },
       body: JSON.stringify(body),
     });

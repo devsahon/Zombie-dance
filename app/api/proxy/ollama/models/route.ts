@@ -12,7 +12,7 @@ export async function GET() {
     // First try to get models from our backend API (which will try database first, then Ollama)
     const response = await fetch(`${uasApiUrl}/models`, {
       headers: {
-        ...(uasApiKey && { Authorization: `Bearer ${uasApiKey}` }),
+        ...(uasApiKey && { "X-API-Key": uasApiKey }),
       },
       cache: "no-store",
     });
@@ -34,7 +34,7 @@ export async function GET() {
       } catch (ollamaError) {
         console.error("Direct Ollama fetch failed:", ollamaError);
       }
-      
+
       return NextResponse.json({ error: "Failed to fetch models" }, { status: response.status });
     }
 

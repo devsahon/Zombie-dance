@@ -49,7 +49,7 @@ export function getPool(): mysql.Pool {
 export async function executeQuery(sql: string, values?: any[]): Promise<any> {
     const connection = await getPool().getConnection();
     try {
-        const [results] = await connection.execute(sql, values);
+        const [results] = await connection.execute(sql, values || []);
         return results;
     } finally {
         connection.release();

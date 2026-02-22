@@ -1,6 +1,9 @@
 import axios, { AxiosResponse } from 'axios';
 import { Logger } from '../utils/logger';
 import { PromptTemplateService } from './promptTemplate';
+import { AgentConfig } from '../types/agent';
+import { getIdentityData } from '../utils/identity';
+import { applyGuardrailsToSystemPrompt, sanitizeModelResponse } from '../utils/ethics';
 import fs from 'fs';
 import path from 'path';
 
@@ -116,7 +119,7 @@ export class OllamaService {
 
     constructor() {
         this.baseURL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
-        this.defaultModel = process.env.OLLAMA_DEFAULT_MODEL || 'qwen2.5:1.5b';
+        this.defaultModel = process.env.OLLAMA_DEFAULT_MODEL || 'llama3.1:latest';
         this.logger = new Logger();
     }
 
@@ -150,8 +153,8 @@ export class OllamaService {
                 parts.push('');
             }
             // Add the database system prompt
-            parts.push(systemPromptFromDB);
-            return parts.join('\n');
+            parts.push(applyGuardrailsToSystemPrompt(systemPromptFromDB));
+            return applyGuardrailsToSystemPrompt(parts.join('\n'));
         }
 
         // Add identity information from identity.json if available
@@ -203,14 +206,14 @@ export class OllamaService {
         // Important: Never identify as the underlying model
         parts.push(`[IMPORTANT] Never identify yourself as Qwen, LLaMA, GPT, Claude, or any other base AI model. You are ${agentConfig.name}, a representative of ${identityData?.system_identity.name || 'the UAS System'}.`);
 
-        return parts.join('\n\n');
+        return applyGuardrailsToSystemPrompt(parts.join('\n\n'));
     }
 
     // Build full prompt with system instructions for generate endpoint
     private buildFullPrompt(userPrompt: string, agentConfig?: AgentConfig): string {
         const systemPrompt = this.buildSystemPrompt(agentConfig);
         const greetingPrefix = agentConfig?.config?.language_preferences?.greeting_prefix || '';
-        
+
         if (systemPrompt) {
             if (greetingPrefix) {
                 return `${systemPrompt}\n\nUser: ${userPrompt}\n${agentConfig?.name}: ${greetingPrefix}`;
@@ -223,20 +226,20 @@ export class OllamaService {
     // Build messages array with system message for chat endpoint
     private buildMessages(userPrompt: string, agentConfig?: AgentConfig): ChatMessage[] {
         const messages: ChatMessage[] = [];
-        
+
         const systemPrompt = this.buildSystemPrompt(agentConfig);
         if (systemPrompt) {
             messages.push({ role: 'system', content: systemPrompt });
         }
-        
+
         // Add greeting prefix to user message if available
         const greetingPrefix = agentConfig?.config?.language_preferences?.greeting_prefix || '';
-        const finalUserMessage = greetingPrefix 
-            ? `${greetingPrefix} ${userPrompt}` 
+        const finalUserMessage = greetingPrefix
+            ? `${greetingPrefix} ${userPrompt}`
             : userPrompt;
-        
+
         messages.push({ role: 'user', content: finalUserMessage });
-        
+
         return messages;
     }
 
@@ -275,7 +278,7 @@ export class OllamaService {
             } else {
                 fullPrompt = this.buildFullPrompt(prompt, agentConfig);
             }
-            
+
             const response: AxiosResponse<GenerateResponse> = await axios.post(
                 `${this.baseURL}/api/generate`,
                 {
@@ -294,7 +297,7 @@ export class OllamaService {
                 }
             );
 
-            return response.data.response || 'No response generated';
+            return sanitizeModelResponse(response.data.response || 'No response generated');
         } catch (error) {
             this.logger.error('Failed to generate response:', error);
             throw new Error('Failed to generate response from Ollama');
@@ -309,16 +312,16 @@ export class OllamaService {
                 // Get the last user message
                 const lastUserMessage = messages[messages.length - 1]?.content || '';
                 const chatHistory = messages.slice(0, -1).map(m => `${m.role}: ${m.content}`).join('\n');
-                
+
                 const systemPrompt = PromptTemplateService.generatePrompt('', agentConfig);
                 const userPrompt = PromptTemplateService.generateChatPrompt(lastUserMessage, chatHistory, agentConfig);
-                
+
                 allMessages = [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: userPrompt }
                 ];
             }
-            
+
             const response: AxiosResponse<ChatResponse> = await axios.post(
                 `${this.baseURL}/api/chat`,
                 {
@@ -337,7 +340,7 @@ export class OllamaService {
                 }
             );
 
-            return response.data.message?.content || 'No response generated';
+            return sanitizeModelResponse(response.data.message?.content || 'No response generated');
         } catch (error) {
             this.logger.error('Failed to chat:', error);
             throw new Error('Failed to chat with Ollama');
@@ -369,13 +372,15 @@ export class OllamaService {
                         try {
                             const data = JSON.parse(line);
                             if (data.response) {
-                                fullResponse += data.response;
+                                const chunkText: string = data.response;
+                                const safeChunk = chunkText.replace(/alibaba\s*cloud/gi, '').replace(/created\s+by\s+alibaba/gi, '').replace(/developed\s+by\s+alibaba/gi, '');
+                                fullResponse += safeChunk;
                                 if (onChunk) {
-                                    onChunk(data.response);
+                                    onChunk(safeChunk);
                                 }
                             }
                             if (data.done) {
-                                resolve(fullResponse);
+                                resolve(sanitizeModelResponse(fullResponse));
                                 return;
                             }
                         } catch (parseError) {
@@ -391,7 +396,7 @@ export class OllamaService {
 
                 response.data.on('end', () => {
                     if (fullResponse) {
-                        resolve(fullResponse);
+                        resolve(sanitizeModelResponse(fullResponse));
                     }
                 });
             });
@@ -444,5 +449,10 @@ export class OllamaService {
                 defaultModel: this.defaultModel
             };
         }
+    }
+
+    // Get Ollama base URL
+    getOllamaUrl(): string {
+        return this.baseURL;
     }
 }

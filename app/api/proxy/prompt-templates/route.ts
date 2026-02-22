@@ -11,7 +11,7 @@ export async function GET() {
   try {
     const response = await fetch(`${uasApiUrl}/prompt-templates`, {
       headers: {
-        ...(uasApiKey && { Authorization: `Bearer ${uasApiKey}` }),
+        ...(uasApiKey && { "X-API-Key": uasApiKey }),
       },
       cache: "no-store",
     })
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(uasApiKey && { Authorization: `Bearer ${uasApiKey}` }),
+        ...(uasApiKey && { "X-API-Key": uasApiKey }),
       },
       body: JSON.stringify(body),
     })

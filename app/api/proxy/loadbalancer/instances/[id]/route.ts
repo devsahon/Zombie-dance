@@ -16,7 +16,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
-        ...(uasApiKey && { Authorization: `Bearer ${uasApiKey}` }),
+        ...(uasApiKey && { "X-API-Key": uasApiKey }),
       },
       body: JSON.stringify(body),
     })

@@ -6,7 +6,17 @@ http://localhost:8000
 ```
 
 ## Authentication
-Currently, no authentication is required. Authentication will be added in future versions.
+Authentication is enforced for sensitive write routes using an API key.
+
+- Read-only routes are public (primarily `GET`).
+- Write routes (`POST`/`PUT`/`DELETE`) for admin settings and prompt templates require `X-API-Key`.
+
+Header:
+
+```http
+X-API-Key: ${UAS_API_KEY}
+Content-Type: application/json
+```
 
 ---
 
@@ -388,9 +398,11 @@ Create new template
 ```bash
 curl -X POST http://localhost:8000/prompt-templates \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: $UAS_API_KEY" \
   -d '{
     "name": "Code Review",
-    "template_content": "Review the following code: {{code}}",
+    "description": "Review a code snippet",
+    "template": "Review the following code: {{code}}",
     "variables": ["code"]
   }'
 ```
@@ -400,13 +412,14 @@ Update template
 ```bash
 curl -X PUT http://localhost:8000/prompt-templates/1 \
   -H "Content-Type: application/json" \
-  -d '{"template_content": "New content..."}'
+  -H "X-API-Key: $UAS_API_KEY" \
+  -d '{"template": "New content..."}'
 ```
 
 #### DELETE /prompt-templates/:id
 Delete template
 ```bash
-curl -X DELETE http://localhost:8000/prompt-templates/1
+curl -X DELETE http://localhost:8000/prompt-templates/1 -H "X-API-Key: $UAS_API_KEY"
 ```
 
 ---

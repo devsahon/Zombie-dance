@@ -12,7 +12,7 @@ export async function GET() {
     const response = await fetch(`${uasApiUrl}/agents`, {
       headers: {
         "Content-Type": "application/json",
-        ...(uasApiKey && { Authorization: `Bearer ${uasApiKey}` }),
+        ...(uasApiKey && { "X-API-Key": uasApiKey }),
       },
       cache: "no-store",
     })

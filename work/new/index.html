@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="bn">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ক্লাউড-লোকাল সংযোগ ও এজেন্ট প্ল্যাটফর্ম — ব্যাখ্যা (বাংলা)</title>
+    <style>
+      :root {
+        --bg: #0b1220;
+        --card: #111a2e;
+        --text: #e9eefc;
+        --muted: #b6c2e2;
+        --accent: #7aa2ff;
+        --good: #55d6a9;
+        --warn: #ffcc66;
+        --bad: #ff6b6b;
+        --border: rgba(255, 255, 255, 0.10);
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans Bengali", "Noto Sans", sans-serif;
+        background: radial-gradient(1200px 600px at 20% 0%, rgba(122, 162, 255, 0.20), transparent 60%),
+                    radial-gradient(900px 500px at 100% 10%, rgba(85, 214, 169, 0.14), transparent 55%),
+                    var(--bg);
+        color: var(--text);
+        line-height: 1.65;
+      }
+
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+
+      header {
+        padding: 44px 18px 18px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(17, 26, 46, 0.55);
+        backdrop-filter: blur(10px);
+      }
+
+      .container {
+        max-width: 1000px;
+        margin: 0 auto;
+      }
+
+      h1 {
+        font-size: 28px;
+        margin: 0 0 10px;
+        letter-spacing: 0.2px;
+      }
+
+      .subtitle {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14.5px;
+      }
+
+      main {
+        padding: 22px 18px 60px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 14px;
+      }
+
+      @media (min-width: 900px) {
+        .grid {
+          grid-template-columns: 1.2fr 0.8fr;
+          align-items: start;
+        }
+      }
+
+      .card {
+        background: rgba(17, 26, 46, 0.7);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 16px 16px;
+      }
+
+      h2 {
+        font-size: 18px;
+        margin: 0 0 10px;
+      }
+
+      h3 {
+        font-size: 15.5px;
+        margin: 14px 0 8px;
+        color: var(--text);
+      }
+
+      p { margin: 10px 0; }
+
+      ul {
+        margin: 10px 0 10px 18px;
+        padding: 0;
+      }
+
+      li { margin: 6px 0; }
+
+      .pillrow {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: rgba(0, 0, 0, 0.15);
+        font-size: 13px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+
+      .dot.good { background: var(--good); }
+      .dot.warn { background: var(--warn); }
+      .dot.bad { background: var(--bad); }
+
+      .callout {
+        border-left: 3px solid var(--accent);
+        padding: 10px 12px;
+        background: rgba(122, 162, 255, 0.10);
+        border-radius: 10px;
+        color: var(--text);
+      }
+
+      .small {
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+        overflow: hidden;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        margin-top: 10px;
+      }
+
+      .table th,
+      .table td {
+        text-align: left;
+        padding: 10px 10px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+
+      .table th {
+        font-weight: 600;
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .table tr:last-child td { border-bottom: 0; }
+
+      footer {
+        padding: 18px;
+        border-top: 1px solid var(--border);
+        color: var(--muted);
+      }
+
+      .kpi {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 10px;
+      }
+
+      @media (min-width: 900px) {
+        .kpi { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+
+      .kpi .item {
+        border: 1px solid var(--border);
+        background: rgba(0, 0, 0, 0.14);
+        border-radius: 12px;
+        padding: 10px;
+      }
+
+      .kpi .label {
+        font-size: 12.5px;
+        color: var(--muted);
+        margin: 0;
+      }
+
+      .kpi .value {
+        font-size: 15px;
+        margin: 4px 0 0;
+        color: var(--text);
+        font-weight: 600;
+      }
+
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 0.95em;
+        padding: 1px 6px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.15);
+        color: var(--text);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <h1>ক্লাউড-লোকাল সংযোগ, এজেন্ট, এবং এডমিন কন্ট্রোল — বাস্তবসম্মত রূপরেখা</h1>
+        <p class="subtitle">
+          লক্ষ্য: ক্লাউড-ভিত্তিক এডিটর (Web IDE) যেন নিরাপদে তোমার লোকাল সার্ভার/লোকাল মডেল ব্যবহার করতে পারে, এবং এডমিন প্যানেল থেকে অপারেশন/স্ট্যাটাস/কনফিগারেশন নিয়ন্ত্রণ করা যায়।
+        </p>
+        <div class="pillrow" aria-label="Status summary">
+          <span class="pill"><span class="dot good" aria-hidden="true"></span> ধারণাটি গ্রহণযোগ্য (সঠিক সিকিউরিটি থাকলে)</span>
+          <span class="pill"><span class="dot warn" aria-hidden="true"></span> অপারেশন অটোমেশন = কন্ট্রোলড CLI দরকার</span>
+          <span class="pill"><span class="dot warn" aria-hidden="true"></span> MCP/Editor control = আলাদা গেটওয়ে/রানটাইম দরকার</span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="container grid">
+        <section class="card">
+          <h2>১) সমস্যা — কেন ক্লাউড এডিটর লোকাল মডেল/লোকাল সার্ভার ব্যবহার করতে চায় না</h2>
+          <p>
+            বেশিরভাগ ক্লাউড-ভিত্তিক এডিটর <strong>HTTPS</strong> দিয়ে চলে। কিন্তু তোমার লোকাল সার্ভার/লোকাল মডেল প্রায়ই <strong>HTTP</strong> (বা লোকাল নেটওয়ার্কে সীমাবদ্ধ) হয়।
+            ফলে ব্রাউজার/ক্লাউড প্ল্যাটফর্ম সাধারণত:
+          </p>
+          <ul>
+            <li><strong>Mixed Content</strong> কারণে HTTPS পেজ থেকে HTTP কল ব্লক করে।</li>
+            <li>Firewall/NAT/Router এর কারণে লোকাল সার্ভারে পৌঁছানো যায় না।</li>
+            <li>পাবলিক ইন্টারনেটে লোকাল রিসোর্স খুলে দিলে সিকিউরিটি ঝুঁকি বাড়ে।</li>
+          </ul>
+
+          <h3>এই সমস্যার মূল উদ্দেশ্য</h3>
+          <div class="callout">
+            লোকাল সার্ভার/লোকাল মডেলকে এমনভাবে “পাবলিকলি অ্যাক্সেসযোগ্য” করা যাতে <strong>সিকিউরিটি বজায় থাকে</strong> এবং <strong>HTTPS-compatible</strong> হয়—তারপর এডিটর/এজেন্ট সেই সেবাগুলো ব্যবহার করবে।
+          </div>
+
+          <h2 style="margin-top:16px;">২) সমাধান — Cloudflare Tunnel বাস্তবে কীভাবে কাজ করে</h2>
+          <p>
+            <strong>Cloudflare Tunnel</strong> এ সাধারণত তোমার লোকাল সার্ভার থেকে একটি প্রোগ্রাম (<code>cloudflared</code>) Cloudflare-এর দিকে <strong>outbound</strong> (ভিতর থেকে বাইরে) কানেকশন করে।
+            এতে করে আলাদা করে router port খুলতে হয় না।
+          </p>
+
+          <table class="table" aria-label="How tunnel works">
+            <thead>
+              <tr>
+                <th>ধাপ</th>
+                <th>সহজ ব্যাখ্যা</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>১</td>
+                <td>তোমার সার্ভারে <code>cloudflared</code> চালু হয় এবং Cloudflare-এর সাথে secure tunnel স্থাপন করে।</td>
+              </tr>
+              <tr>
+                <td>২</td>
+                <td>Cloudflare DNS-এ <code>zombiecoder.my.id</code> ডোমেইনকে ওই টানেলের সাথে যুক্ত করা হয়।</td>
+              </tr>
+              <tr>
+                <td>৩</td>
+                <td>ক্লাউড এডিটর HTTPS দিয়ে <code>https://zombiecoder.my.id</code> এ হিট করলে Cloudflare সেটা টানেল দিয়ে লোকাল সার্ভারে পাঠায়।</td>
+              </tr>
+              <tr>
+                <td>৪</td>
+                <td>ফলাফল: ক্লাউড থেকে লোকাল সার্ভারে সিকিউর + HTTPS-compatible অ্যাক্সেস পাওয়া যায়।</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>এখানে কী কী সতর্কতা জরুরি</h3>
+          <ul>
+            <li><strong>Access Control</strong>: কে এই ডোমেইন ব্যবহার করতে পারবে—Cloudflare Zero Trust দিয়ে সীমাবদ্ধ করা উচিত।</li>
+            <li><strong>Audit Log</strong>: কোন ইউজার/ক্লায়েন্ট কী কল করল—লগ রাখতে হবে।</li>
+            <li><strong>Least Privilege</strong>: শুধুমাত্র দরকারি endpoint/tools expose করতে হবে।</li>
+          </ul>
+
+          <h2>৩) এডমিন প্যানেল থেকে “Server Start/Stop” — কেন CLI দরকার</h2>
+          <p>
+            এডমিন প্যানেল থেকে সার্ভার স্টার্ট/স্টপ করতে চাইলে, ব্যাকএন্ডকে শেষ পর্যন্ত OS-level কাজ করতে হবে। সেটা করতে “একটি সেফ CLI” সবচেয়ে বাস্তবসম্মত উপায়।
+          </p>
+
+          <h3>সেফ CLI মানে কী</h3>
+          <ul>
+            <li>যে কোনো কমান্ড না—শুধু allowlist করা সাব-কমান্ড (start/stop/restart/status)।</li>
+            <li>প্রতিটি কমান্ডে input validation (কোন সার্ভিস, কোন এনভায়রনমেন্ট)।</li>
+            <li>প্রতিটি অপারেশনের audit log (কে চালাল, কখন, রেজাল্ট কী)।</li>
+          </ul>
+
+          <h3>এডমিন প্যানেলে “নতুন কমান্ড যোগ” কীভাবে কাজ করবে</h3>
+          <p>
+            UI থেকে তুমি “Runbook commands” যোগ করতে পারবে (উদাহরণ: <code>restart uas-server</code>, <code>tunnel status</code>)।
+            ব্যাকএন্ড সেই কমান্ডকে raw shell হিসেবে না চালিয়ে, CLI-এর ভিতরে ম্যাপ করবে—এটাই নিরাপত্তার মূল কথা।
+          </p>
+
+          <h2>৪) প্রোটোকল (SSE / STDIO / HTTP) — কোনটা কোথায় লাগবে</h2>
+          <table class="table" aria-label="Protocols">
+            <thead>
+              <tr>
+                <th>প্রোটোকল</th>
+                <th>কখন ব্যবহার সুবিধাজনক</th>
+                <th>সহজ ব্যাখ্যা</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>HTTP/HTTPS</strong></td>
+                <td>CRUD API, settings, start/stop, status</td>
+                <td>সাধারণ request/response। ওয়েব অ্যাপের জন্য স্ট্যান্ডার্ড।</td>
+              </tr>
+              <tr>
+                <td><strong>SSE</strong></td>
+                <td>ধীরে ধীরে output দেখানো (streaming)</td>
+                <td>একদিকে স্ট্রিম—লাইভ লগ/লাইভ রেসপন্স দেখাতে ভাল।</td>
+              </tr>
+              <tr>
+                <td><strong>STDIO</strong></td>
+                <td>MCP server/process integration</td>
+                <td>প্রসেসকে stdin/stdout দিয়ে কথা বলা—টুল সার্ভার চালাতে সুবিধা।</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h2>৫) “MCP ফোল্ডার” ও ওপেন-সোর্স MCP — বাস্তবে কী হবে</h2>
+          <p>
+            এখানে লক্ষ্য হচ্ছে: বিভিন্ন ধরনের এডিটর/টুলকে একটি স্ট্যান্ডার্ড ইন্টারফেসে এনে এজেন্টকে ক্ষমতা দেওয়া—যেমন ফাইল পড়া, নোট লেখা, টাস্ক চালানো ইত্যাদি।
+          </p>
+
+          <div class="callout">
+            <strong>বাস্তবতা:</strong> শুধুমাত্র একটি “folder” তৈরি করলেই MCP চালু হবে না। সাধারণত MCP-এর জন্য একটি <strong>Gateway/Runtime</strong> লাগে যেটা MCP server গুলো চালাবে এবং Admin/Agent কে API দিয়ে tool-call করতে দেবে।
+          </div>
+
+          <h3>Recommended building blocks</h3>
+          <ul>
+            <li><strong>MCP Gateway Service</strong>: MCP servers চালাবে (stdio), tools list/execute করবে।</li>
+            <li><strong>Access Control</strong>: কোন agent কোন tool ব্যবহার করতে পারবে।</li>
+            <li><strong>Allowlisted filesystem roots</strong>: শুধুমাত্র নির্দিষ্ট project path।</li>
+          </ul>
+
+          <h2>৬) এজেন্ট/সার্ভার আসলে কী কাজ করবে (LangChain + Memory + Tools)</h2>
+          <p>
+            তোমার সিস্টেমে এজেন্টের কাজ হবে “শুধু লেখা” নয়; বরং কাজের ধাপগুলো ম্যানেজ করা:
+          </p>
+          <ul>
+            <li>কোড বোঝা, পরিবর্তন প্রস্তাব করা, এবং নির্দিষ্ট টুল দিয়ে পরিবর্তন করা (যেখানে অনুমতি আছে)।</li>
+            <li>প্রোজেক্ট মেমোরি/কনটেক্সট: আগের আলোচনা, ফাইল কনটেক্সট, সিদ্ধান্ত—যাতে বারবার বুঝাতে না হয়।</li>
+            <li>অপারেশনাল কাজ: health check, logs দেখা, safe restart, deploy workflow ইত্যাদি।</li>
+          </ul>
+
+          <h3>নন-টেকনিক্যালভাবে বললে</h3>
+          <div class="callout">
+            এজেন্ট হবে “একজন সহকারী অপারেটর”—যে নির্দেশ বুঝে কাজ সাজিয়ে নেয়, এবং অনুমতি অনুযায়ী টুল ব্যবহার করে কাজ সম্পন্ন করে।
+          </div>
+
+          <h2>৭) “Admin Status Page” — কী কী দেখাবে</h2>
+          <p>
+            একটি কেন্দ্রীয় ড্যাশবোর্ড তোমার অপারেশনকে অনেক সহজ করবে। সেখানে রিয়েল-টাইমে দেখা যাবে:
+          </p>
+          <ul>
+            <li>Cloudflare Tunnel: Connected/Disconnected, last heartbeat</li>
+            <li>Server status: online/offline, CPU/RAM (যদি সংগ্রহ করা হয়)</li>
+            <li>Agent activity: আজকে কত call, avg latency, error rate</li>
+            <li>Tools/MCP: কোন tool available, last tool call, failures</li>
+          </ul>
+
+          <h2>৮) গ্রহণযোগ্যতা (Acceptability) — ১৫ বছরের অভিজ্ঞতা থেকে সিদ্ধান্ত</h2>
+          <p>
+            এই আর্কিটেকচার <strong>খুবই গ্রহণযোগ্য</strong>—কারণ এটি বাস্তব সমস্যার বাস্তব সমাধান দেয়। তবে শর্ত হলো:
+          </p>
+          <ul>
+            <li><strong>Security-first</strong>: tunnel + CLI + tool execution সবকিছুর উপর শক্ত ACL/Zero Trust দরকার।</li>
+            <li><strong>Auditability</strong>: কে কী চালালো—সব log থাকতে হবে।</li>
+            <li><strong>Operational guardrails</strong>: ভুল কমান্ডে production down না হয়ে যায়—সেফগার্ড দরকার।</li>
+          </ul>
+
+          <h2>৯) আমার পক্ষ থেকে আরও উন্নত পরামর্শ (ব্যবহারযোগ্যভাবে)</h2>
+          <ul>
+            <li>
+              <strong>Zero Trust Access</strong>: Cloudflare Access দিয়ে নির্দিষ্ট email/domain/OTP ছাড়া endpoint hit করা যাবে না।
+            </li>
+            <li>
+              <strong>Command approval workflow</strong>: High-risk অপারেশনে (restart/prod changes) “Approve” ধাপ রাখো।
+            </li>
+            <li>
+              <strong>Read-only by default</strong>: MCP/CLI tools প্রথমে read-only মোডে চালাও, পরে permissions ধাপে ধাপে বাড়াও।
+            </li>
+            <li>
+              <strong>Safe sandbox</strong>: agent যে file edit করবে, সেটার scope project root-এ সীমিত রাখো।
+            </li>
+            <li>
+              <strong>Metrics ভিত্তিক সিদ্ধান্ত</strong>: latency/error রেকর্ড করে bottleneck ধরো, এরপর optimize করো।
+            </li>
+          </ul>
+
+          <h2>১০) আপনার প্রত্যাশা কী ছিল, এবং আমরা কী করেছি (ক্লায়েন্ট-ফ্রেন্ডলি সারাংশ)</h2>
+          <p>
+            এখানে লক্ষ্য ছিল একটি <strong>এজেন্ট-ভিত্তিক এডমিন সিস্টেম</strong> বানানো—যাতে নিরাপদভাবে কনফিগারেশন পরিবর্তন করা যায়, ব্যবহার/পারফরম্যান্স দেখা যায়,
+            এবং ভবিষ্যতে এডিটরের সাথে কানেক্ট করে কাজ করানো যায়।
+          </p>
+
+          <table class="table" aria-label="Expectations vs delivered">
+            <thead>
+              <tr>
+                <th>প্রত্যাশা</th>
+                <th>বর্তমান অবস্থা</th>
+                <th>ফলাফল/আউটপুট আপনি কীভাবে দেখবেন</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Admin settings নিরাপদ করা (যাতে যে কেউ পরিবর্তন করতে না পারে)</td>
+                <td><strong>Done</strong>: write routes এ <code>X-API-Key</code> বাধ্যতামূলক</td>
+                <td>Settings save করলে “Unauthorized” না এসে সফল হবে (ঠিক API key থাকলে)</td>
+              </tr>
+              <tr>
+                <td>Persona/Template আপডেটে “identity leak” ঠেকানো</td>
+                <td><strong>Done</strong>: persona/template save + runtime prompt এ guardrails</td>
+                <td>Agent পরিচয় বদলাবে না; ভুল উৎস/কোম্পানির নাম দেখাবে না</td>
+              </tr>
+              <tr>
+                <td>Daily activity metrics (আজ/৭দিন/৩০দিন)</td>
+                <td><strong>Done</strong>: metrics endpoints + dashboard cards</td>
+                <td>ড্যাশবোর্ডে calls/latency/error rate দেখা যাবে</td>
+              </tr>
+              <tr>
+                <td>Default model নির্বাচন (সিস্টেম-wide)</td>
+                <td><strong>Done</strong>: admin UI থেকে default model set</td>
+                <td>পরবর্তী agent calls এ নতুন model কার্যকর হবে</td>
+              </tr>
+              <tr>
+                <td>Prompt templates CRUD (admin panel থেকে)</td>
+                <td><strong>Done</strong>: endpoints + proxy routes</td>
+                <td>Template create/update/delete করলে audit trail থাকবে</td>
+              </tr>
+              <tr>
+                <td>Realtime chat (admin panel থেকে live agent communication)</td>
+                <td><strong>Partially done</strong>: WebSocket server service আছে (streaming style)</td>
+                <td>পরের ধাপে admin UI তে “Live chat” + live updates যুক্ত হবে</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h2>১১) সার্ভার চালু/বন্ধ/চেক — যেকোনো ফোল্ডার থেকে (সহজ নিয়ম)</h2>
+          <p>
+            আপনি যেন যে কোনো ফোল্ডারে বসে দ্রুত বুঝতে পারেন সার্ভার চলছে কি না—এটাই লক্ষ্য। এই অংশটি অপারেশন টিম/ক্লায়েন্ট টিমের জন্য।
+          </p>
+          <div class="callout">
+            <strong>চেক (সবচেয়ে সহজ):</strong> ব্রাউজারে/কমান্ডে <code>http://localhost:8000/health</code> খুলুন। OK দেখালে সার্ভার চলছে।
+          </div>
+          <h3>বাস্তব ব্যবহারের নিয়ম (নন-টেকনিক্যাল)</h3>
+          <ul>
+            <li><strong>Start:</strong> “Backend server” চালু করতে অপারেশন টিম নির্দিষ্ট start কমান্ড ব্যবহার করবে (Runbook অনুযায়ী)</li>
+            <li><strong>Stop:</strong> একইভাবে stop/restart কমান্ড (Runbook অনুযায়ী)</li>
+            <li><strong>Status:</strong> health endpoint + admin dashboard metrics</li>
+          </ul>
+          <p class="small">
+            নোট: আমরা intentionally “যে কেউ যে কোনো কমান্ড চালাবে” এমন ব্যবস্থা দিইনি। নিরাপত্তার জন্য পরের ধাপে <strong>Allowlisted Safe CLI</strong> যোগ হবে,
+            যাতে start/stop/status কেবল অনুমোদিত অপারেশন হিসেবেই করা যায় এবং সবকিছু audit log এ যায়।
+          </p>
+
+          <h2>১২) এডিটরের সাথে সংযোগ — MCP কী, কীভাবে যুক্ত হবে, এবং কী সুবিধা পাবেন</h2>
+          <p>
+            <strong>MCP (Model Context Protocol)</strong> হলো এমন একটি স্ট্যান্ডার্ড পদ্ধতি—যেটার মাধ্যমে এডিটর/AI agent নিরাপদভাবে টুল ব্যবহার করতে পারে:
+            যেমন file পড়া/লেখা, task list, database query, বা নির্দিষ্ট workflow চালানো।
+          </p>
+          <h3>কোন কোন এডিটর/টুল উপকার পাবে</h3>
+          <ul>
+            <li><strong>VS Code / Cursor / Windsurf টাইপ IDE</strong>: কোড বেসে কাজ, refactor, PR-ready changes</li>
+            <li><strong>Web IDE</strong>: tunnel এর মাধ্যমে লোকাল সার্ভিসে নিরাপদ কানেকশন</li>
+          </ul>
+          <h3>সংযোগ হলে কী সুবিধা পাবেন</h3>
+          <ul>
+            <li><strong>One-click operations</strong>: admin UI/IDE থেকে controlled start/stop/status (পরের ধাপে)</li>
+            <li><strong>Tool-based accuracy</strong>: agent “অনুমান” না করে প্রকৃত ফাইল/স্টেট দেখে কাজ করবে</li>
+            <li><strong>Auditability</strong>: কোন tool call/command কখন কার দ্বারা হয়েছে—লগ থাকবে</li>
+          </ul>
+          <div class="callout">
+            <strong>বাস্তবায়নের নীতি:</strong> MCP সংযোগ মানেই full-access নয়। প্রতিটি tool আলাদা permission/allowlist অনুযায়ী চালানো হবে।
+          </div>
+
+          <h2>১৩) WebSocket / Realtime আপডেট — কোথায় আছি, কী বাকি</h2>
+          <p>
+            রিয়েল-টাইম কমিউনিকেশনের জন্য আমাদের কাছে একটি WebSocket সার্ভিস আছে—যা streaming style এ agent response chunk আকারে পাঠাতে পারে।
+            তবে admin panel UI তে “Chat section” এখনো সম্পূর্ণভাবে realtime হিসেবে wired নয়।
+          </p>
+          <h3>পরের ধাপে কী হবে (আপনার প্রত্যাশা অনুযায়ী)</h3>
+          <ul>
+            <li><strong>Admin panel “Chat” পেজ</strong>: agent list দেখাবে এবং সেখান থেকে live chat করা যাবে</li>
+            <li><strong>Live streaming output</strong>: উত্তর লিখতে লিখতেই দেখা যাবে (SSE বা WS)</li>
+            <li><strong>Presence + status</strong>: কোন agent active/inactive, কোন model চলছে</li>
+            <li><strong>Metrics live update</strong>: calls/latency/error realtime refresh</li>
+          </ul>
+
+          <h2>১৪) ডাটাবেজ/মেমোরি/ডায়নামিক ডাটা — কীভাবে ম্যানেজ হচ্ছে</h2>
+          <p>
+            সিস্টেমের সব গুরুত্বপূর্ণ ডাটা (agents, settings, template, audit logs) ডাটাবেজে রাখা হয়—যাতে সার্ভার রিস্টার্ট হলেও কনফিগারেশন হারায় না।
+          </p>
+          <ul>
+            <li><strong>Settings</strong>: default model ইত্যাদি <code>system_settings</code> এ থাকে</li>
+            <li><strong>Agents</strong>: persona/system prompt সহ কনফিগ <code>agents</code> টেবিলে থাকে</li>
+            <li><strong>Audit/metrics</strong>: কোন endpoint কতবার/কত latency এ হিট হলো—<code>api_audit_logs</code> এ থাকে</li>
+            <li><strong>Memory</strong>: কথোপকথনের রেকর্ড/কনটেক্সট অনুযায়ী conversation routes দিয়ে manage করা হয়</li>
+          </ul>
+
+          <h2>১৫) পরবর্তী ধাপ (Phase 2) — কীভাবে “পূর্ণ আউটপুট” নিশ্চিত হবে</h2>
+          <p>
+            আপনার প্রত্যাশা অনুযায়ী “এডমিন প্যানেল থেকে নিরাপদভাবে সার্ভার অপারেশন + এডিটর ইন্টিগ্রেশন + রিয়েল-টাইম চ্যাট”—এই পুরোটা দিতে Phase 2 তে আমরা ৩টা জিনিস ডেলিভার করব:
+          </p>
+          <ul>
+            <li><strong>Safe CLI Runner</strong>: allowlist command (start/stop/status/restart) + approval + audit log</li>
+            <li><strong>MCP Gateway</strong>: tools registry, permissions, editor-friendly integration</li>
+            <li><strong>Realtime Chat UI</strong>: admin panel এ live agent chat + streaming output</li>
+          </ul>
+
+          <p class="small" style="margin-top:14px;">
+            এই ডকুমেন্টটি নন-টেকনিক্যাল পাঠকের জন্য সহজভাবে লেখা হয়েছে, কিন্তু ভিতরের গাইডলাইনগুলো বাস্তব production engineering অনুশীলনের সাথে সামঞ্জস্যপূর্ণ।
+          </p>
+        </section>
+
+        <aside class="card">
+          <h2>সংক্ষেপে: আমরা কোথায় আছি, কোথায় যেতে চাই</h2>
+          <div class="kpi" aria-label="Summary KPIs">
+            <div class="item">
+              <p class="label">বর্তমান অবস্থা</p>
+              <p class="value">লোকাল সার্ভার + এডমিন প্যানেল চলছে</p>
+            </div>
+            <div class="item">
+              <p class="label">মূল বাধা</p>
+              <p class="value">HTTPS বনাম HTTP + নিরাপত্তা</p>
+            </div>
+            <div class="item">
+              <p class="label">প্রস্তাবিত ব্রিজ</p>
+              <p class="value">Cloudflare Tunnel + Zero Trust</p>
+            </div>
+            <div class="item">
+              <p class="label">অপারেশন কন্ট্রোল</p>
+              <p class="value">Allowlisted CLI + Admin UI</p>
+            </div>
+          </div>
+
+          <h3 style="margin-top:14px;">বাস্তবায়নের ধাপ (সহজ রোডম্যাপ)</h3>
+          <ol class="small" style="margin: 10px 0 0 18px;">
+            <li>Cloudflare Tunnel চালু + Access policy সেট</li>
+            <li>Server/Agent status endpoint + dashboard</li>
+            <li>Safe CLI (start/stop/status) + audit log</li>
+            <li>MCP Gateway + tool allowlist</li>
+            <li>Streaming (SSE/WS) + metrics</li>
+          </ol>
+
+          <h3>ঝুঁকি (এগুলো কন্ট্রোল না করলে সমস্যা)</h3>
+          <ul class="small">
+            <li><strong>Unrestricted commands</strong> দিলে সার্ভার compromise হতে পারে।</li>
+            <li><strong>Open tunnel</strong> দিলে অননুমোদিত অ্যাক্সেস হতে পারে।</li>
+            <li><strong>Missing logs</strong> হলে সমস্যা হলে দায়/কারণ ধরা কঠিন।</li>
+          </ul>
+
+          <div class="callout" style="margin-top: 14px;">
+            <strong>মূল কথা:</strong> টেকনিক্যালি সম্ভব, ব্যবসায়িকভাবে উপকারী—কিন্তু সিকিউরিটি ও অপারেশনের রেলিংস (guardrails) বাধ্যতামূলক।
+          </div>
+
+          <p class="small" style="margin-top: 12px;">
+            ফাইল লোকেশন: <code>/home/sahon/Zombie-dance/work/new/index.html</code>
+          </p>
+        </aside>
+      </div>
+    </main>
+
+    <footer>
+      <div class="container">
+        <div class="small">
+          © Zombie Dance — Engineering Note (বাংলা) | আপডেট করা যাবে এডমিন পরিকল্পনা/বাস্তবায়নের সাথে মিলিয়ে।
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -11,7 +11,7 @@ export async function GET() {
   try {
     const response = await fetch(`${uasApiUrl}/status`, {
       headers: {
-        ...(uasApiKey && { Authorization: `Bearer ${uasApiKey}` }),
+        ...(uasApiKey && { "X-API-Key": uasApiKey }),
       },
       cache: "no-store",
     })

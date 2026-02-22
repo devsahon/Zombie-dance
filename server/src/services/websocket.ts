@@ -2,10 +2,11 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Logger } from '../utils/logger';
 import { OllamaService } from './ollama';
 import { executeQuery } from '../database/connection';
+import { sanitizeModelResponse } from '../utils/ethics';
 
 // Simple UUID generator
 function generateUUID(): string {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
         const r = Math.random() * 16 | 0;
         const v = c === 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
@@ -31,6 +32,22 @@ export class WebSocketService {
         this.ollamaService = new OllamaService();
 
         this.setupWebSocketServer();
+    }
+
+    private async getDefaultModel(): Promise<string> {
+        try {
+            const rows = await executeQuery(
+                'SELECT setting_value FROM system_settings WHERE setting_key = ? LIMIT 1',
+                ['default_model']
+            );
+            if (Array.isArray(rows) && rows.length > 0 && (rows[0] as any).setting_value) {
+                return (rows[0] as any).setting_value;
+            }
+        } catch (error) {
+            this.logger.warn('Failed to load default_model from system_settings, falling back to env/default:', error);
+        }
+
+        return process.env.OLLAMA_DEFAULT_MODEL || 'llama3.1:latest';
     }
 
     private setupWebSocketServer(): void {
@@ -167,38 +184,38 @@ export class WebSocketService {
 
     private async handleAgentStream(ws: WebSocket, data: any): Promise<void> {
         const { agentId, action, prompt, messages, model } = data;
-        
+
         this.logger.info(`WebSocket agent stream request`, { agentId, action });
-        
+
         try {
             // Check if agentId is a numeric ID (database agent)
             const isNumericId = !isNaN(Number(agentId));
             let dbAgent = null;
             let agentConfig = null;
-            let modelName = model || 'qwen2.5-coder:1.5b';
-            
+            let modelName = model || await this.getDefaultModel();
+
             if (isNumericId) {
                 const numericId = parseInt(agentId, 10);
                 const agentData = await executeQuery(
-                    'SELECT id, name, type, status, config, metadata, model_name FROM agents WHERE id = ?',
+                    'SELECT id, name, type, status, persona_name, config, metadata FROM agents WHERE id = ?',
                     [numericId]
                 );
-                
+
                 if (Array.isArray(agentData) && agentData.length > 0) {
                     dbAgent = agentData[0];
                     try {
-                        const config = typeof dbAgent.config === 'string' 
-                            ? JSON.parse(dbAgent.config) 
+                        const config = typeof dbAgent.config === 'string'
+                            ? JSON.parse(dbAgent.config)
                             : dbAgent.config;
-                        
+
                         // Parse metadata if exists
                         let metadata: any = {};
                         if (dbAgent.metadata) {
-                            metadata = typeof dbAgent.metadata === 'string' 
-                                ? JSON.parse(dbAgent.metadata) 
+                            metadata = typeof dbAgent.metadata === 'string'
+                                ? JSON.parse(dbAgent.metadata)
                                 : dbAgent.metadata;
                         }
-                        
+
                         // Build agent config for Ollama service
                         agentConfig = {
                             id: dbAgent.id,
@@ -210,11 +227,9 @@ export class WebSocketService {
                             config: config || {},
                             metadata: metadata
                         };
-                        
-                        // Use model_name from database, or config.model, or default
-                        if (dbAgent.model_name) {
-                            modelName = dbAgent.model_name;
-                        } else if (config?.model) {
+
+                        // Use config.model if set, otherwise default
+                        if (typeof config?.model === 'string' && config.model.trim()) {
                             modelName = config.model;
                         }
                     } catch (parseError) {
@@ -222,7 +237,7 @@ export class WebSocketService {
                     }
                 }
             }
-            
+
             // Send start message with session ID
             const sessionId = generateUUID();
             this.sendMessage(ws, {
@@ -237,9 +252,9 @@ export class WebSocketService {
                     message: `Starting ${action} with ${agentConfig?.name || agentId}...`
                 }
             });
-            
+
             let response = '';
-            
+
             // Handle different actions
             if (action === 'generate' || action === 'generate_code') {
                 if (!prompt) {
@@ -249,10 +264,10 @@ export class WebSocketService {
                     });
                     return;
                 }
-                
+
                 // Stream the response word by word for effect - pass agentConfig for system prompt
-                const fullResponse = await this.ollamaService.generate(prompt, modelName, agentConfig || undefined);
-                
+                const fullResponse = sanitizeModelResponse(await this.ollamaService.generate(prompt, modelName, agentConfig || undefined));
+
                 // Split response into chunks for streaming effect
                 const words = fullResponse.split(/\s+/);
                 for (let i = 0; i < words.length; i++) {
@@ -268,7 +283,7 @@ export class WebSocketService {
                     // Small delay for streaming effect
                     await new Promise(resolve => setTimeout(resolve, 30));
                 }
-                
+
             } else if (action === 'chat') {
                 if (!Array.isArray(messages)) {
                     this.sendMessage(ws, {
@@ -277,10 +292,10 @@ export class WebSocketService {
                     });
                     return;
                 }
-                
+
                 // chat() returns a string directly - pass agentConfig for system prompt
-                const responseText = await this.ollamaService.chat(messages, modelName, agentConfig || undefined);
-                
+                const responseText = sanitizeModelResponse(await this.ollamaService.chat(messages, modelName, agentConfig || undefined));
+
                 const words = responseText.split(/\s+/);
                 for (let i = 0; i < words.length; i++) {
                     response += (i > 0 ? ' ' : '') + words[i];
@@ -301,7 +316,7 @@ export class WebSocketService {
                 });
                 return;
             }
-            
+
             // Send complete message with session info
             this.sendMessage(ws, {
                 type: 'agent_stream_complete',
@@ -316,7 +331,7 @@ export class WebSocketService {
                     timestamp: new Date().toISOString()
                 }
             });
-            
+
         } catch (error: any) {
             this.logger.error('WebSocket agent stream error:', error);
             this.sendMessage(ws, {

@@ -6,6 +6,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { applyGuardrailsToSystemPrompt } from '../utils/ethics';
 
 // Load identity.json
 interface IdentityData {
@@ -66,7 +67,7 @@ try {
 }
 
 export class PromptTemplateService {
-    
+
     /**
      * Simple template replacement
      */
@@ -112,7 +113,7 @@ License: ${identity.branding.license}`;
         let identity = `[AGENT_IDENTITY]
 You are ${agentConfig.name}, a ${agentConfig.type} agent.`;
 
-        if (agentConfig.system_prompt) {
+        if (agentConfig.systempplyGuardrailsToSystemPrompt(a_prompt) {)
             identity += `\n${agentConfig.system_prompt}`;
         } else if (agentConfig.config.capabilities) {
             identity += `\nYour role is to help with ${agentConfig.config.capabilities.join(', ')}.`;
@@ -127,7 +128,7 @@ You are ${agentConfig.name}, a ${agentConfig.type} agent.`;
     private static buildBehavioralRules(agentConfig: AgentConfig): string {
         const langPrefs = agentConfig.config.language_preferences || {};
         const greetingPrefix = langPrefs.greeting_prefix || 'ভাইয়া,';
-        
+
         return `[BEHAVIORAL_RULES]
 - Always identify as ${agentConfig.name}.
 - Greeting Prefix: ${greetingPrefix}
@@ -144,7 +145,7 @@ You are ${agentConfig.name}, a ${agentConfig.type} agent.`;
         const org = identityData?.system_identity.branding.organization || 'Developer Zone';
         const location = identityData?.system_identity.branding.location || 'Dhaka, Bangladesh';
         const owner = identityData?.system_identity.branding.owner || 'Sahon Srabon';
-        
+
         // ===== SYSTEM IDENTITY =====
         parts.push('[SYSTEM_IDENTITY]');
         parts.push(`You are ${agentConfig.name}.`);
@@ -153,29 +154,29 @@ You are ${agentConfig.name}, a ${agentConfig.type} agent.`;
         parts.push(`Location: ${location}`);
         parts.push(`Owner: ${owner}`);
         parts.push('');
-        
+
         // ===== AGENT PERSONA =====
         if (agentConfig.system_prompt) {
             parts.push('[PERSONA]');
-            parts.push(agentConfig.system_prompt);
+            parts.push(applyGuardrailsToSystemPrompt(agentConfig.system_prompt));
             parts.push('');
         }
-        
+
         // ===== DYNAMIC RESPONSE TEMPLATE =====
         // Load response_template from metadata if available
         if (agentConfig.metadata && typeof agentConfig.metadata === 'object') {
             const metadata = agentConfig.metadata as any;
             if (metadata.response_template) {
-                const template = typeof metadata.response_template === 'string' 
-                    ? JSON.parse(metadata.response_template) 
+                const template = typeof metadata.response_template === 'string'
+                    ? JSON.parse(metadata.response_template)
                     : metadata.response_template;
-                
+
                 if (template.prefix) {
                     parts.push('[GREETING_PREFIX]');
                     parts.push(`Start your response with: "${template.prefix}"`);
                     parts.push('');
                 }
-                
+
                 if (template.style) {
                     parts.push('[RESPONSE_STYLE]');
                     parts.push(`Style: ${template.style}`);
@@ -186,7 +187,7 @@ You are ${agentConfig.name}, a ${agentConfig.type} agent.`;
                 }
             }
         }
-        
+
         // ===== RESPONSE RULES =====
         parts.push('[RESPONSE RULES]');
         parts.push('- Reply in English only.');
@@ -194,7 +195,7 @@ You are ${agentConfig.name}, a ${agentConfig.type} agent.`;
         parts.push('- Never make up words or hallucinate.');
         parts.push('- Never identify as Alibaba, Qwen, LLaMA, or any other base AI model.');
         parts.push('');
-        
+
         // ===== USER QUESTION =====
         parts.push(`[QUESTION]\n${userQuery}`);
         parts.push('');
@@ -208,7 +209,7 @@ You are ${agentConfig.name}, a ${agentConfig.type} agent.`;
      */
     static generateCodePrompt(userQuery: string, agentConfig: AgentConfig): string {
         const parts: string[] = [];
-        
+
         parts.push(this.buildSystemIdentity());
         parts.push('');
         parts.push(this.buildAgentIdentity(agentConfig));
@@ -227,8 +228,8 @@ You are ${agentConfig.name}, a ${agentConfig.type} agent.`;
      * Generate chat prompt with history
      */
     static generateChatPrompt(
-        userMessage: string, 
-        chatHistory: string, 
+        userMessage: string,
+        chatHistory: string,
         agentConfig: AgentConfig
     ): string {
         const langPrefs = agentConfig.config.language_preferences || {};
@@ -237,7 +238,7 @@ You are ${agentConfig.name}, a ${agentConfig.type} agent.`;
         const org = identityData?.system_identity.branding.organization || 'Developer Zone';
         const location = identityData?.system_identity.branding.location || 'Dhaka, Bangladesh';
         const owner = identityData?.system_identity.branding.owner || 'Sahon Srabon';
-        
+
         // ===== SYSTEM IDENTITY =====
         parts.push('[SYSTEM_IDENTITY]');
         parts.push(`You are ${agentConfig.name}.`);
@@ -246,13 +247,13 @@ You are ${agentConfig.name}, a ${agentConfig.type} agent.`;
         parts.push(`Location: ${location}`);
         parts.push(`Owner: ${owner}`);
         parts.push('');
-        
+
         // ===== RULES =====
         parts.push('[RULES]');
         parts.push('- Reply in English only.');
         parts.push('- Keep it short (2-3 sentences).');
         parts.push('');
-        
+
         parts.push(`[QUESTION]\n${userMessage}`);
         parts.push('');
         parts.push('[ANSWER]');

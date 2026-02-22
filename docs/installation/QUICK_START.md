@@ -93,7 +93,11 @@ DB_USER=root
 DB_PASSWORD=mysql_password
 DB_NAME=uas_admin
 CORS_ORIGIN=http://localhost:3000
-OLLAMA_URL=http://localhost:11434
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_DEFAULT_MODEL=llama3.1:latest
+
+# Admin/settings write auth
+UAS_API_KEY=your_uas_api_key_here
 ```
 
 ---

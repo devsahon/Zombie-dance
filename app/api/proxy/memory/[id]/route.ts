@@ -15,7 +15,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const response = await fetch(`${uasApiUrl}/memory/${id}?limit=${limit}`, {
       headers: {
-        ...(uasApiKey && { Authorization: `Bearer ${uasApiKey}` }),
+        ...(uasApiKey && { "X-API-Key": uasApiKey }),
       },
       cache: "no-store",
     })
@@ -45,7 +45,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const response = await fetch(`${uasApiUrl}/memory/${id}`, {
       method: "DELETE",
       headers: {
-        ...(uasApiKey && { Authorization: `Bearer ${uasApiKey}` }),
+        ...(uasApiKey && { "X-API-Key": uasApiKey }),
       },
     })
 

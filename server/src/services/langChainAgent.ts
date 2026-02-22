@@ -25,35 +25,35 @@ interface ChatMessage {
 class SimpleBufferMemory {
     private messages: ChatMessage[] = [];
     private k: number;
-    
+
     constructor(k: number = 5) {
         this.k = k;
     }
-    
+
     addUserMessage(content: string): void {
         this.messages.push({ role: 'user', content, timestamp: Date.now() });
         this.prune();
     }
-    
+
     addAssistantMessage(content: string): void {
         this.messages.push({ role: 'assistant', content, timestamp: Date.now() });
         this.prune();
     }
-    
+
     private prune(): void {
         if (this.messages.length > this.k * 2) {
             this.messages = this.messages.slice(-this.k * 2);
         }
     }
-    
+
     getHistory(): ChatMessage[] {
         return [...this.messages];
     }
-    
+
     getHistoryText(): string {
         return this.messages.map(m => `${m.role}: ${m.content}`).join('\n');
     }
-    
+
     clear(): void {
         this.messages = [];
     }
@@ -98,6 +98,22 @@ export class LangChainAgentService {
         this.logger = new Logger();
     }
 
+    private async getDefaultModel(): Promise<string> {
+        try {
+            const rows = await executeQuery(
+                'SELECT setting_value FROM system_settings WHERE setting_key = ? LIMIT 1',
+                ['default_model']
+            );
+            if (Array.isArray(rows) && rows.length > 0 && (rows[0] as any).setting_value) {
+                return (rows[0] as any).setting_value;
+            }
+        } catch (error) {
+            this.logger.warn('Failed to load default_model from system_settings, falling back to env/default:', error);
+        }
+
+        return process.env.OLLAMA_DEFAULT_MODEL || 'llama3.1:latest';
+    }
+
     /**
      * Get or create memory for a session
      */
@@ -117,31 +133,46 @@ export class LangChainAgentService {
                 'SELECT * FROM agents WHERE id = ?',
                 [agentId]
             );
-            
+
             if (Array.isArray(result) && result.length > 0) {
                 const agent = result[0];
-                
+
                 // Parse config and metadata
                 let config: Record<string, any> = {};
                 let metadata: Record<string, any> = {};
-                
+
                 if (agent.config) {
                     config = typeof agent.config === 'string' ? JSON.parse(agent.config) : agent.config;
                 }
                 if (agent.metadata) {
                     metadata = typeof agent.metadata === 'string' ? JSON.parse(agent.metadata) : agent.metadata;
                 }
-                
+
+                const defaultModel = await this.getDefaultModel();
+
+                const bufferMemorySize =
+                    (typeof config?.buffer_memory_size === 'number' ? config.buffer_memory_size : undefined) ||
+                    (typeof metadata?.buffer_memory_size === 'number' ? metadata.buffer_memory_size : undefined) ||
+                    5;
+
+                const resolvedSystemPrompt =
+                    (typeof metadata?.system_prompt === 'string' ? metadata.system_prompt : undefined) ||
+                    (typeof config?.system_instructions === 'string' ? config.system_instructions : undefined) ||
+                    DEFAULT_SYSTEM_PROMPT;
+
+                const resolvedModel =
+                    (typeof config?.model === 'string' && config.model.trim() ? config.model : undefined) ||
+                    defaultModel;
+
                 return {
                     id: agent.id,
                     name: agent.name,
                     type: agent.type,
                     status: agent.status,
                     persona_name: agent.persona_name,
-                    system_prompt: metadata?.system_prompt || config?.system_instructions || DEFAULT_SYSTEM_PROMPT,
-                    model_name: agent.model_name || config?.model || process.env.OLLAMA_DEFAULT_MODEL || 'llama3.1:latest',
-                    memory_limit: agent.memory_limit || 10,
-                    buffer_memory_size: agent.buffer_memory_size || 5,
+                    system_prompt: resolvedSystemPrompt,
+                    model_name: resolvedModel,
+                    buffer_memory_size: bufferMemorySize,
                     config,
                     metadata
                 };
@@ -239,16 +270,16 @@ export class LangChainAgentService {
             // Check if query requires tool use
             let finalQuery = query;
             let toolResponse = '';
-            
+
             // Simple tool detection based on keywords
             const queryLower = query.toLowerCase();
-            
+
             for (const tool of tools) {
                 let shouldUseTool = false;
-                
+
                 // Web search keywords
                 if (tool.name === 'web_search' && (
-                    queryLower.includes('search') || 
+                    queryLower.includes('search') ||
                     queryLower.includes('what is') ||
                     queryLower.includes('who is') ||
                     queryLower.includes('latest') ||
@@ -256,7 +287,7 @@ export class LangChainAgentService {
                 )) {
                     shouldUseTool = true;
                 }
-                
+
                 // Calculator keywords
                 if (tool.name === 'calculator' && (
                     queryLower.includes('calculate') ||
@@ -268,7 +299,7 @@ export class LangChainAgentService {
                 )) {
                     shouldUseTool = true;
                 }
-                
+
                 // Datetime keywords
                 if (tool.name === 'datetime' && (
                     queryLower.includes('time') ||
@@ -278,7 +309,7 @@ export class LangChainAgentService {
                 )) {
                     shouldUseTool = true;
                 }
-                
+
                 if (shouldUseTool) {
                     try {
                         this.logger.info(`Using tool: ${tool.name}`);
@@ -304,11 +335,11 @@ export class LangChainAgentService {
                 fullPrompt += historyText;
             }
             fullPrompt += `\n\n[USER_QUERY]\n${query}`;
-            
+
             if (toolResponse) {
                 fullPrompt += `\n\n[TOOL_RESULT]\n${toolResponse}`;
             }
-            
+
             fullPrompt += `\n\n[INSTRUCTIONS]\nProvide a clear, helpful response.`;
 
             // Call Ollama
@@ -316,9 +347,9 @@ export class LangChainAgentService {
             const response = await this.ollamaService.generate(
                 fullPrompt,
                 modelToUse,
-                { 
-                    id: agentId, 
-                    name: agentConfig.name, 
+                {
+                    id: agentId,
+                    name: agentConfig.name,
                     type: agentConfig.type,
                     status: agentConfig.status,
                     persona_name: agentConfig.persona_name,
@@ -357,7 +388,7 @@ export class LangChainAgentService {
 
         } catch (error: any) {
             this.logger.error('Agent execution failed:', error);
-            
+
             return {
                 success: false,
                 output: '',
@@ -394,7 +425,7 @@ export class LangChainAgentService {
         if (!memory) {
             return null;
         }
-        
+
         const chatHistory = memory.getHistory();
         return {
             sessionId,

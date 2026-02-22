@@ -54,7 +54,7 @@ router.get('/', async (req, res) => {
   // Fallback to default agents if database fails
   try {
     const ollamaHealth = await ollamaService.healthCheck();
-    
+
     const defaultAgents = [
       {
         id: 'ollama-agent',
@@ -126,7 +126,7 @@ router.get('/', async (req, res) => {
     return;
   } catch (error) {
     logger.error('Failed to get agents:', error);
-    
+
     res.status(500).json({
       success: false,
       error: 'Failed to fetch agents',
@@ -140,9 +140,9 @@ router.get('/', async (req, res) => {
 router.get('/:agentId/status', async (req, res) => {
   try {
     const { agentId } = req.params;
-    
+
     let agentStatus;
-    
+
     switch (agentId) {
       case 'ollama-agent':
         const ollamaHealth = await ollamaService.healthCheck();
@@ -160,7 +160,7 @@ router.get('/:agentId/status', async (req, res) => {
           }
         };
         break;
-        
+
       case 'memory-agent':
         agentStatus = {
           id: agentId,
@@ -175,7 +175,7 @@ router.get('/:agentId/status', async (req, res) => {
           }
         };
         break;
-        
+
       case 'cli-agent':
         agentStatus = {
           id: agentId,
@@ -190,7 +190,7 @@ router.get('/:agentId/status', async (req, res) => {
           }
         };
         break;
-        
+
       default:
         return res.status(404).json({
           success: false,
@@ -207,7 +207,7 @@ router.get('/:agentId/status', async (req, res) => {
     return;
   } catch (error) {
     logger.error(`Failed to get agent status for ${req.params.agentId}:`, error);
-    
+
     res.status(500).json({
       success: false,
       error: 'Failed to get agent status',
@@ -222,10 +222,10 @@ router.get('/:agentId/status', async (req, res) => {
 router.post('/:agentId/start', async (req, res) => {
   try {
     const { agentId } = req.params;
-    
+
     // In a real implementation, this would start the actual agent service
     // For now, we'll just return a success response
-    
+
     res.json({
       success: true,
       message: `Agent ${agentId} started successfully`,
@@ -234,7 +234,7 @@ router.post('/:agentId/start', async (req, res) => {
     });
   } catch (error) {
     logger.error(`Failed to start agent ${req.params.agentId}:`, error);
-    
+
     res.status(500).json({
       success: false,
       error: 'Failed to start agent',
@@ -248,10 +248,10 @@ router.post('/:agentId/start', async (req, res) => {
 router.post('/:agentId/stop', async (req, res) => {
   try {
     const { agentId } = req.params;
-    
+
     // In a real implementation, this would stop the actual agent service
     // For now, we'll just return a success response
-    
+
     res.json({
       success: true,
       message: `Agent ${agentId} stopped successfully`,
@@ -260,7 +260,7 @@ router.post('/:agentId/stop', async (req, res) => {
     });
   } catch (error) {
     logger.error(`Failed to stop agent ${req.params.agentId}:`, error);
-    
+
     res.status(500).json({
       success: false,
       error: 'Failed to stop agent',
@@ -274,25 +274,25 @@ router.post('/:agentId/stop', async (req, res) => {
 router.post('/:agentId/call', async (req, res) => {
   try {
     const { agentId } = req.params;
-    const { action, payload } = req.body;
-    
+    const { action, payload, model: requestedModelTopLevel } = req.body;
+
     let result;
     let dbAgent = null;
     let modelName = 'qwen2.5-coder:1.5b'; // Default model
     let agentConfig: AgentConfig | undefined = undefined;
-    
+
     // Check if agentId is a numeric ID (database agent)
     const isNumericId = !isNaN(Number(agentId));
-    
+
     if (isNumericId) {
       // It's a numeric ID - check database (convert to integer)
       const numericId = parseInt(agentId, 10);
-      
+
       const agentData = await executeQuery(
         'SELECT id, name, type, status, persona_name, description, config, metadata FROM agents WHERE id = ?',
         [numericId]
       );
-      
+
       if (!Array.isArray(agentData) || agentData.length === 0) {
         return res.status(404).json({
           success: false,
@@ -300,19 +300,19 @@ router.post('/:agentId/call', async (req, res) => {
           agentId
         });
       }
-      
+
       dbAgent = agentData[0];
-      
+
       // Extract model and build agent config from dbAgent
       try {
-        const config = typeof dbAgent.config === 'string' 
-          ? JSON.parse(dbAgent.config) 
+        const config = typeof dbAgent.config === 'string'
+          ? JSON.parse(dbAgent.config)
           : dbAgent.config;
-        
+
         const metadata = typeof dbAgent.metadata === 'string'
           ? JSON.parse(dbAgent.metadata)
           : dbAgent.metadata;
-        
+
         // Build agent config for Ollama service
         agentConfig = {
           id: dbAgent.id,
@@ -324,7 +324,7 @@ router.post('/:agentId/call', async (req, res) => {
           config: config || {},
           metadata: metadata || {}
         };
-        
+
         if (config?.model) {
           modelName = config.model;
         }
@@ -332,7 +332,7 @@ router.post('/:agentId/call', async (req, res) => {
         console.error('Failed to parse agent config:', parseError);
       }
     }
-    
+
     // Handle different agent types
     switch (agentId) {
       case 'ollama-agent':
@@ -346,26 +346,29 @@ router.post('/:agentId/call', async (req, res) => {
             agentId
           });
         }
-        
+
         if (!payload || !payload.prompt) {
           return res.status(400).json({
             success: false,
             error: 'Payload with prompt is required for Ollama agent'
           });
         }
-        
+
         // Handle different actions
         switch (action) {
           case 'generate_code':
           case 'generate':
-            const response = await ollamaService.generate(payload.prompt, payload.model || modelName);
-            result = {
-              response: response,
-              explanation: `${action === 'generate_code' ? 'Code' : 'Text'} generated successfully`,
-              model: payload.model || modelName
-            };
-            break;
-            
+            {
+              const resolvedModel = requestedModelTopLevel || payload.model || modelName;
+              const response = await ollamaService.generate(payload.prompt, resolvedModel);
+              result = {
+                response: response,
+                explanation: `${action === 'generate_code' ? 'Code' : 'Text'} generated successfully`,
+                model: resolvedModel
+              };
+              break;
+            }
+
           case 'chat':
             if (!Array.isArray(payload.messages)) {
               return res.status(400).json({
@@ -373,14 +376,17 @@ router.post('/:agentId/call', async (req, res) => {
                 error: 'Messages array is required for chat action'
               });
             }
-            const chatResponse = await ollamaService.chat(payload.messages, payload.model || modelName);
-            result = {
-              response: chatResponse,
-              explanation: 'Chat response generated successfully',
-              model: payload.model || modelName
-            };
-            break;
-          
+            {
+              const resolvedModel = requestedModelTopLevel || payload.model || modelName;
+              const chatResponse = await ollamaService.chat(payload.messages, resolvedModel);
+              result = {
+                response: chatResponse,
+                explanation: 'Chat response generated successfully',
+                model: resolvedModel
+              };
+              break;
+            }
+
           default:
             return res.status(400).json({
               success: false,
@@ -388,7 +394,7 @@ router.post('/:agentId/call', async (req, res) => {
             });
         }
         break;
-        
+
       case 'memory-agent':
         if (action === 'store_conversation') {
           if (!payload.conversation_id || !payload.messages) {
@@ -423,7 +429,7 @@ router.post('/:agentId/call', async (req, res) => {
           });
         }
         break;
-        
+
       case 'cli-agent':
         if (action === 'execute_command') {
           if (!payload.command) {
@@ -446,7 +452,7 @@ router.post('/:agentId/call', async (req, res) => {
           });
         }
         break;
-        
+
       default:
         // For database agents (numeric ID) or unknown string IDs
         if (dbAgent) {
@@ -458,12 +464,13 @@ router.post('/:agentId/call', async (req, res) => {
                 error: 'Payload with prompt is required for generate action'
               });
             }
-            
-            const dbResponse = await ollamaService.generate(payload.prompt, payload.model || modelName, agentConfig);
+
+            const resolvedModel = requestedModelTopLevel || payload.model || modelName;
+            const dbResponse = await ollamaService.generate(payload.prompt, resolvedModel, agentConfig);
             result = {
               response: dbResponse,
               explanation: `Code/text generated successfully using agent: ${dbAgent.name}`,
-              model: payload.model || modelName,
+              model: resolvedModel,
               agent: {
                 id: dbAgent.id,
                 name: dbAgent.name,
@@ -477,12 +484,13 @@ router.post('/:agentId/call', async (req, res) => {
                 error: 'Messages array is required for chat action'
               });
             }
-            
-            const dbChatResponse = await ollamaService.chat(payload.messages, payload.model || modelName, agentConfig);
+
+            const resolvedModel = requestedModelTopLevel || payload.model || modelName;
+            const dbChatResponse = await ollamaService.chat(payload.messages, resolvedModel, agentConfig);
             result = {
               response: dbChatResponse,
               explanation: `Chat response generated successfully using agent: ${dbAgent.name}`,
-              model: payload.model || modelName,
+              model: resolvedModel,
               agent: {
                 id: dbAgent.id,
                 name: dbAgent.name,
@@ -521,7 +529,7 @@ router.post('/:agentId/call', async (req, res) => {
     return;
   } catch (error) {
     logger.error(`Failed to call agent ${req.params.agentId}:`, error);
-    
+
     res.status(500).json({
       success: false,
       error: 'Failed to call agent',
