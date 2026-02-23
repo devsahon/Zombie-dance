@@ -30,8 +30,6 @@
   },
   "license": "MIT",
   "activationEvents": [
-    "onCommand:zombie-dance.openPanel",
-    "onCommand:zombie-dance.connectServer",
     "onStartupFinished"
   ],
   "main": "./out/extension.js",
@@ -54,6 +52,18 @@
         "title": "Disconnect from Server",
         "icon": "$(debug-disconnect)",
         "category": "Zombie Dance"
+      },
+      {
+        "command": "zombie-dance.mcpListTools",
+        "title": "MCP: List Tools",
+        "icon": "$(list-unordered)",
+        "category": "Zombie Dance"
+      },
+      {
+        "command": "zombie-dance.mcpExecuteTool",
+        "title": "MCP: Execute Tool",
+        "icon": "$(play)",
+        "category": "Zombie Dance"
       }
     ],
     "views": {
@@ -61,7 +71,8 @@
         {
           "id": "zombie-dance-explorer",
           "name": "Zombie Dance AI",
-          "when": "zombie-dance.connected"
+          "when": "zombie-dance.connected",
+          "icon": "$(robot)"
         }
       ]
     },
@@ -82,6 +93,11 @@
           "default": "http://localhost:8000",
           "description": "Zombie Dance server URL",
           "pattern": "^https?://.+"
+        },
+        "zombie-dance.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API key used for protected endpoints (sent as X-API-Key). Leave empty if not needed."
         },
         "zombie-dance.autoConnect": {
           "type": "boolean",
@@ -113,6 +129,12 @@
         {
           "command": "zombie-dance.disconnectServer",
           "when": "zombie-dance.connected"
+        },
+        {
+          "command": "zombie-dance.mcpListTools"
+        },
+        {
+          "command": "zombie-dance.mcpExecuteTool"
         }
       ],
       "activitybar": [

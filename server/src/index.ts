@@ -23,6 +23,7 @@ import serversRoutes from './routes/servers';
 import settingsRoutes from './routes/settings';
 import metricsRoutes from './routes/metrics';
 import promptTemplatesRoutes from './routes/prompt-templates';
+import mcpRoutes from './routes/mcp';
 import { initializeMemoryRoutes } from './routes/memory-new';
 import { initializeCLIRoutes } from './routes/cli-new';
 
@@ -89,6 +90,7 @@ app.use('/servers', serversRoutes);
 app.use('/settings', settingsRoutes);
 app.use('/metrics', metricsRoutes);
 app.use('/prompt-templates', promptTemplatesRoutes);
+app.use('/mcp', mcpRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {

@@ -1,8 +1,6 @@
 import axios, { AxiosResponse } from 'axios';
 import { Logger } from '../utils/logger';
 import { PromptTemplateService } from './promptTemplate';
-import { AgentConfig } from '../types/agent';
-import { getIdentityData } from '../utils/identity';
 import { applyGuardrailsToSystemPrompt, sanitizeModelResponse } from '../utils/ethics';
 import fs from 'fs';
 import path from 'path';

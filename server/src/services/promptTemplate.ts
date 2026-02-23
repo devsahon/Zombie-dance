@@ -113,8 +113,8 @@ License: ${identity.branding.license}`;
         let identity = `[AGENT_IDENTITY]
 You are ${agentConfig.name}, a ${agentConfig.type} agent.`;
 
-        if (agentConfig.systempplyGuardrailsToSystemPrompt(a_prompt) {)
-            identity += `\n${agentConfig.system_prompt}`;
+        if (agentConfig.system_prompt) {
+            identity += `\n${applyGuardrailsToSystemPrompt(agentConfig.system_prompt)}`;
         } else if (agentConfig.config.capabilities) {
             identity += `\nYour role is to help with ${agentConfig.config.capabilities.join(', ')}.`;
         }

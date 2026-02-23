@@ -8,7 +8,7 @@ export function activate(context: vscode.ExtensionContext) {
     console.log('Zombie Dance AI extension is now active!');
 
     zombieManager = new ZombieDanceManager(context);
-    
+
     // Register commands
     const openPanelCommand = vscode.commands.registerCommand('zombie-dance.openPanel', () => {
         ZombieDancePanel.createOrShow(context.extensionUri);
@@ -22,8 +22,16 @@ export function activate(context: vscode.ExtensionContext) {
         zombieManager.disconnect();
     });
 
+    const mcpListToolsCommand = vscode.commands.registerCommand('zombie-dance.mcpListTools', async () => {
+        await zombieManager.mcpListTools();
+    });
+
+    const mcpExecuteToolCommand = vscode.commands.registerCommand('zombie-dance.mcpExecuteTool', async () => {
+        await zombieManager.mcpExecuteToolInteractive();
+    });
+
     // Add commands to context
-    context.subscriptions.push(openPanelCommand, connectCommand, disconnectCommand);
+    context.subscriptions.push(openPanelCommand, connectCommand, disconnectCommand, mcpListToolsCommand, mcpExecuteToolCommand);
 
     // Auto-connect if enabled
     const config = vscode.workspace.getConfiguration('zombie-dance');

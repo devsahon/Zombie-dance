@@ -254,6 +254,9 @@ Template write অপারেশনগুলো template_content এর শু�
 - Identity regression test:
   - `curl -s -X POST http://localhost:8000/agents/1/call -H 'Content-Type: application/json' -d '{"action":"generate_code","payload":{"prompt":"Who are you? Who developed you? Who is your owner?"}}' | grep -i alibaba || echo 'OK'`
 
+- Qwen-specific regression (model override + response sanitization):
+  - `curl -s -X POST http://localhost:8000/agents/1/call -H 'Content-Type: application/json' -d '{"action":"generate_code","payload":{"prompt":"Who are you? Who developed you?"},"model":"qwen2.5-coder:1.5b"}' | grep -i alibaba || echo 'OK'`
+
 ---
 
 ## Phase 3 — Safe CLI runner + Admin runbooks
@@ -285,6 +288,47 @@ Template write অপারেশনগুলো template_content এর শু�
 - MCP Gateway service (stdio transports)
 - Tool allowlist + filesystem root allowlist
 - Optional VS Code extension bridge for true editor control
+
+### 4.3 Implemented now (MCP HTTP Gateway)
+
+Backend endpoints:
+
+- `GET /mcp/tools` (public)
+  - Returns tool registry
+- `POST /mcp/execute` (protected)
+  - Requires `X-API-Key` header (`UAS_API_KEY`)
+  - Executes a tool from registry (subject to allowlists in tool config)
+
+Security:
+
+- `GET` is read-only and public
+- `execute` is protected with `X-API-Key`
+
+### 4.4 Editor integration (Windsurf/VS Code extension)
+
+Extension settings:
+
+- `zombie-dance.serverUrl` = `http://localhost:8000`
+- `zombie-dance.apiKey` = same value as backend `UAS_API_KEY`
+
+Commands:
+
+- `MCP: List Tools`
+- `MCP: Execute Tool`
+
+### 4.5 Restart + Verification
+
+Important: MCP routes will appear only after server rebuild + restart.
+
+- Rebuild:
+  - `cd server && npm run build`
+- Start:
+  - `cd server && npm start`
+
+Verify:
+
+- `curl -s http://localhost:8000/mcp/tools | head`
+- `curl -s -X POST http://localhost:8000/mcp/execute -H 'Content-Type: application/json' -H "X-API-Key: $UAS_API_KEY" -d '{"toolName":"calculator","input":"2+2"}' | head`
 
 ---
 
