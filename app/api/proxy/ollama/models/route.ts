@@ -18,30 +18,35 @@ export async function GET() {
     });
 
     if (!response.ok) {
-      // If our backend fails, try to get directly from Ollama
+      const text = await response.text();
+      let payload: any = null;
       try {
-        const ollamaResponse = await fetch(`${process.env.OLLAMA_BASE_URL || 'http://localhost:11434'}/api/tags`);
-        if (ollamaResponse.ok) {
-          const ollamaData = await ollamaResponse.json();
-          return NextResponse.json({
-            success: true,
-            data: ollamaData.models || [],
-            count: ollamaData.models?.length || 0,
-            source: 'ollama_direct',
-            timestamp: new Date().toISOString()
-          });
-        }
-      } catch (ollamaError) {
-        console.error("Direct Ollama fetch failed:", ollamaError);
+        payload = text ? JSON.parse(text) : null;
+      } catch {
+        payload = null;
       }
 
-      return NextResponse.json({ error: "Failed to fetch models" }, { status: response.status });
+      return NextResponse.json(
+        {
+          success: false,
+          error: payload?.error || "Failed to fetch models",
+          message: payload?.message || response.statusText,
+        },
+        { status: response.status },
+      );
     }
 
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
     console.error("[v0] Models fetch error:", error);
-    return NextResponse.json({ error: "Connection failed" }, { status: 503 });
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Connection failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 503 },
+    );
   }
 }

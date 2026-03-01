@@ -22,79 +22,36 @@ export async function GET(request: Request) {
     });
 
     if (!response.ok) {
-      console.error("[v0] Servers API error:", response.status, response.statusText);
-      // Return fallback data for development
-      return NextResponse.json([
+      const text = await response.text();
+      let payload: any = null;
+      try {
+        payload = text ? JSON.parse(text) : null;
+      } catch {
+        payload = null;
+      }
+
+      return NextResponse.json(
         {
-          id: 1,
-          name: "Main Server",
-          hostname: "localhost",
-          ip_address: "127.0.0.1",
-          location: "Local",
-          status: "online",
-          cpu_load: 25.5,
-          memory_usage: 60.2,
-          disk_usage: 45.8,
-          uptime_seconds: 86400,
-          last_heartbeat: new Date().toISOString(),
-          provider_id: 1,
-          provider_name: "Ollama Local",
-          provider_type: "local",
-          metadata: {
-            version: "1.0.0",
-            region: "local"
-          }
+          success: false,
+          error: payload?.error || "Failed to fetch servers",
+          message: payload?.message || response.statusText,
         },
-        {
-          id: 2,
-          name: "Backup Server",
-          hostname: "backup-server",
-          ip_address: "192.168.1.100",
-          location: "Network",
-          status: "offline",
-          cpu_load: 0,
-          memory_usage: 0,
-          disk_usage: 30.1,
-          uptime_seconds: 0,
-          last_heartbeat: new Date(Date.now() - 3600000).toISOString(),
-          provider_id: null,
-          provider_name: null,
-          provider_type: null,
-          metadata: {
-            version: "1.0.0",
-            region: "backup"
-          }
-        }
-      ]);
+        { status: response.status },
+      );
     }
 
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
     console.error("[v0] Servers fetch error:", error);
-    // Return fallback data
-    return NextResponse.json([
+    return NextResponse.json(
       {
-        id: 1,
-        name: "Main Server",
-        hostname: "localhost",
-        ip_address: "127.0.0.1",
-        location: "Local",
-        status: "online",
-        cpu_load: 25.5,
-        memory_usage: 60.2,
-        disk_usage: 45.8,
-        uptime_seconds: 86400,
-        last_heartbeat: new Date().toISOString(),
-        provider_id: 1,
-        provider_name: "Ollama Local",
-        provider_type: "local",
-        metadata: {
-          version: "1.0.0",
-          region: "local"
-        }
-      }
-    ]);
+        success: false,
+        error: "Internal server error",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    );
   }
 }
 

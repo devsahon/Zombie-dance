@@ -18,87 +18,35 @@ export async function GET() {
     })
 
     if (!response.ok) {
-      console.error("[v0] Agents API error:", response.status, response.statusText)
-      // Return fallback data for development
-      return NextResponse.json({
-        success: true,
-        agents: [
-          {
-            id: 1,
-            name: "Code Editor Agent",
-            status: "active",
-            type: "editor",
-            endpoint: "localhost:8000",
-            capabilities: ["code_generation", "file_editing"],
-            metrics: {
-              requestCount: 0,
-              avgResponseTime: 0,
-              errorRate: 0
-            }
-          },
-          {
-            id: 2,
-            name: "Master Orchestrator",
-            status: "active",
-            type: "master",
-            endpoint: "localhost:8000",
-            capabilities: ["orchestration", "task_management"],
-            metrics: {
-              requestCount: 0,
-              avgResponseTime: 0,
-              errorRate: 0
-            }
-          },
-          {
-            id: 3,
-            name: "Chat Assistant",
-            status: "active",
-            type: "chatbot",
-            endpoint: "localhost:8000",
-            capabilities: ["chat", "conversation"],
-            metrics: {
-              requestCount: 0,
-              avgResponseTime: 0,
-              errorRate: 0
-            }
-          }
-        ]
-      })
+      const text = await response.text()
+      let payload: any = null
+      try {
+        payload = text ? JSON.parse(text) : null
+      } catch {
+        payload = null
+      }
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: payload?.error || "Failed to fetch agents",
+          message: payload?.message || response.statusText,
+        },
+        { status: response.status },
+      )
     }
 
     const data = await response.json()
     return NextResponse.json(data)
   } catch (error) {
     console.error("[v0] Agents fetch error:", error)
-    // Return fallback data
-    return NextResponse.json({
-      success: true,
-      agents: [
-        {
-          id: 1,
-          name: "Code Editor Agent",
-          status: "active",
-          type: "editor",
-          endpoint: "localhost:8000",
-          capabilities: ["code_generation", "file_editing"]
-        },
-        {
-          id: 2,
-          name: "Master Orchestrator",
-          status: "active",
-          type: "master",
-          endpoint: "localhost:8000",
-          capabilities: ["orchestration", "task_management"]
-        },
-        {
-          id: 3,
-          name: "Chat Assistant",
-          status: "active",
-          type: "chatbot",
-          endpoint: "localhost:8000",
-          capabilities: ["chat", "conversation"]
-        }
-      ]
-    })
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Internal server error",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
   }
 }

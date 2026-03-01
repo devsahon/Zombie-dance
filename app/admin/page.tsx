@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
 
 export default function AdminBackupPage() {
   const [isBackingUp, setIsBackingUp] = useState(false);
-  const [backups, setBackups] = useState<Array<{name: string, path: string, created: string}>>([]);
+  const [backups, setBackups] = useState<Array<{ name: string, path: string, created: string }>>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const handleCreateBackup = async () => {
@@ -16,9 +16,9 @@ export default function AdminBackupPage() {
       const response = await fetch('/api/backup', {
         method: 'POST',
       });
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
         toast({
           title: 'Backup created',
@@ -62,7 +62,7 @@ export default function AdminBackupPage() {
   };
 
   // Load backups on component mount
-  useState(() => {
+  useEffect(() => {
     fetchBackups();
   }, []);
 
@@ -78,8 +78,8 @@ export default function AdminBackupPage() {
     <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">System Backup</h1>
-        <Button 
-          onClick={handleCreateBackup} 
+        <Button
+          onClick={handleCreateBackup}
           disabled={isBackingUp}
           className="bg-green-600 hover:bg-green-700"
         >
@@ -114,7 +114,7 @@ export default function AdminBackupPage() {
                     </p>
                   </div>
                   <div className="flex space-x-2">
-                    <a 
+                    <a
                       href={`/api/backup/download?file=${encodeURIComponent(backup.name)}`}
                       download
                       className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { writeFile, mkdir, readdir } from 'fs/promises';
+import { writeFile, mkdir, readdir, stat } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import archiver from 'archiver';
@@ -21,7 +21,7 @@ async function ensureBackupDir() {
 async function createDatabaseDump() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const dumpFile = `${BACKUP_DIR}/db_dump_${timestamp}.sql`;
-  
+
   // Replace these with your actual database credentials
   const dbConfig = {
     host: process.env.DB_HOST || 'localhost',
@@ -31,7 +31,7 @@ async function createDatabaseDump() {
   };
 
   const command = `mysqldump -h ${dbConfig.host} -u ${dbConfig.user} -p${dbConfig.password} ${dbConfig.database} > ${dumpFile}`;
-  
+
   try {
     await execPromise(command);
     return dumpFile;
@@ -68,17 +68,17 @@ export async function POST() {
   try {
     // Create database dump
     const dumpFile = await createDatabaseDump();
-    
+
     // Create backup archive
     const backupPath = await createBackupArchive();
-    
+
     return NextResponse.json({
       success: true,
       message: 'Backup created successfully',
       path: backupPath,
       size: (await stat(backupPath)).size
     });
-    
+
   } catch (error) {
     console.error('Backup failed:', error);
     return NextResponse.json(

@@ -51,6 +51,23 @@ async function upsertSystemSetting(key: string, value: string, type: 'string' | 
   );
 }
 
+async function getSystemSettingInt(key: string): Promise<number | null> {
+  const raw = await getSystemSetting(key);
+  if (raw == null) return null;
+  const v = parseInt(String(raw), 10);
+  return Number.isFinite(v) ? v : null;
+}
+
+async function getSystemSettingBool(key: string): Promise<boolean | null> {
+  const raw = await getSystemSetting(key);
+  if (raw == null) return null;
+  const normalized = String(raw).trim().toLowerCase();
+  if (!normalized) return null;
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return null;
+}
+
 // Get default model
 router.get('/default-model', async (req, res) => {
   try {
@@ -170,6 +187,108 @@ router.put('/agents/:agentId/persona', requireApiKey, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to update agent persona',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
+});
+
+router.get('/runtime', async (req, res) => {
+  try {
+    const [activeProviderId, preferStreaming, timeoutMs] = await Promise.all([
+      getSystemSettingInt('active_provider_id'),
+      getSystemSettingBool('prefer_streaming'),
+      getSystemSettingInt('model_request_timeout_ms')
+    ]);
+
+    res.json({
+      success: true,
+      runtime: {
+        active_provider_id: activeProviderId,
+        prefer_streaming: preferStreaming,
+        model_request_timeout_ms: timeoutMs
+      },
+      timestamp: new Date().toISOString()
+    });
+    return;
+  } catch (error) {
+    logger.error('Failed to get runtime settings:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get runtime settings',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
+});
+
+router.put('/runtime', requireApiKey, async (req, res) => {
+  try {
+    const { active_provider_id, prefer_streaming, model_request_timeout_ms } = req.body || {};
+
+    if (active_provider_id !== undefined) {
+      const numeric = typeof active_provider_id === 'number'
+        ? active_provider_id
+        : parseInt(String(active_provider_id), 10);
+      if (!Number.isFinite(numeric) || numeric <= 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'active_provider_id must be a positive integer',
+          timestamp: new Date().toISOString()
+        });
+      }
+      await upsertSystemSetting('active_provider_id', String(numeric), 'integer');
+    }
+
+    if (prefer_streaming !== undefined) {
+      if (typeof prefer_streaming !== 'boolean') {
+        return res.status(400).json({
+          success: false,
+          error: 'prefer_streaming must be a boolean',
+          timestamp: new Date().toISOString()
+        });
+      }
+      await upsertSystemSetting('prefer_streaming', prefer_streaming ? 'true' : 'false', 'boolean');
+    }
+
+    if (model_request_timeout_ms !== undefined) {
+      const numeric = typeof model_request_timeout_ms === 'number'
+        ? model_request_timeout_ms
+        : parseInt(String(model_request_timeout_ms), 10);
+      if (!Number.isFinite(numeric) || numeric < 1000) {
+        return res.status(400).json({
+          success: false,
+          error: 'model_request_timeout_ms must be an integer >= 1000',
+          timestamp: new Date().toISOString()
+        });
+      }
+      await upsertSystemSetting('model_request_timeout_ms', String(numeric), 'integer');
+    }
+
+    const [activeProviderId, preferStreaming, timeoutMs] = await Promise.all([
+      getSystemSettingInt('active_provider_id'),
+      getSystemSettingBool('prefer_streaming'),
+      getSystemSettingInt('model_request_timeout_ms')
+    ]);
+
+    res.json({
+      success: true,
+      message: 'Runtime settings updated successfully',
+      runtime: {
+        active_provider_id: activeProviderId,
+        prefer_streaming: preferStreaming,
+        model_request_timeout_ms: timeoutMs
+      },
+      timestamp: new Date().toISOString()
+    });
+    return;
+  } catch (error) {
+    logger.error('Failed to update runtime settings:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update runtime settings',
       message: error instanceof Error ? error.message : 'Unknown error',
       timestamp: new Date().toISOString()
     });

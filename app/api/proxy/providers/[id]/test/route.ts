@@ -2,9 +2,11 @@ import { type NextRequest, NextResponse } from "next/server"
 
 const UAS_API_URL = process.env.UAS_API_URL || "http://localhost:8000"
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const response = await fetch(`${UAS_API_URL}/providers/${params.id}/test`, {
+    const { id } = await context.params
+
+    const response = await fetch(`${UAS_API_URL}/providers/${id}/test`, {
       method: "POST",
       headers: {
         "X-API-Key": process.env.UAS_API_KEY || "",

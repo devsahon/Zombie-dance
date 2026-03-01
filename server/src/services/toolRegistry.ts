@@ -5,10 +5,26 @@
  */
 
 import { executeQuery } from '../database/connection';
-import { DynamicTool } from '@langchain/core/tools';
-import { Tool } from '@langchain/core/tools';
 import { execSync } from 'child_process';
 import path from 'path';
+
+export interface Tool {
+    name: string;
+    description: string;
+    func: (input: string) => Promise<string>;
+}
+
+export class DynamicTool implements Tool {
+    name: string;
+    description: string;
+    func: (input: string) => Promise<string>;
+
+    constructor(params: { name: string; description: string; func: (input: string) => Promise<string> }) {
+        this.name = params.name;
+        this.description = params.description;
+        this.func = params.func;
+    }
+}
 
 export interface ToolConfig {
     name: string;
@@ -16,6 +32,16 @@ export interface ToolConfig {
     description: string;
     isActive: boolean;
     config: Record<string, any>;
+}
+
+export interface ToolCatalogItem {
+    name: string;
+    category: string;
+    description: string;
+    isActive: boolean;
+    config: Record<string, any>;
+    source: 'built_in' | 'agent_tools';
+    agentId?: number;
 }
 
 export interface AgentTool {
@@ -54,6 +80,8 @@ export class LangChainToolFactory {
                 return this.createFileReadTool(config);
             case 'file_write':
                 return this.createFileWriteTool(config);
+            case 'code_execution':
+                return this.createCodeExecutionTool(config);
             case 'calculator':
                 return this.createCalculatorTool();
             case 'datetime':
@@ -63,6 +91,93 @@ export class LangChainToolFactory {
             default:
                 return null;
         }
+    }
+
+    /**
+     * Code execution tool (allowlisted languages, sandboxed via subprocess)
+     * Input formats:
+     * - JSON: {"language":"javascript"|"python", "code":"..."}
+     * - string: treated as JavaScript expression
+     */
+    private static createCodeExecutionTool(config: Record<string, any>): Tool {
+        const allowedLanguagesRaw = config.allowed_languages || ['javascript', 'python', 'typescript'];
+        const allowedLanguages = Array.isArray(allowedLanguagesRaw) ? allowedLanguagesRaw : [String(allowedLanguagesRaw)];
+        const timeoutMs = typeof config.timeout === 'number' ? config.timeout : 30000;
+        const pythonCommand = typeof config.python_command === 'string' && config.python_command.trim()
+            ? config.python_command.trim()
+            : 'python3';
+
+        return new DynamicTool({
+            name: 'code_execution',
+            description: `Execute small code snippets. Allowed languages: ${allowedLanguages.join(', ')}. Input: JSON {language, code} or a JS expression string.`,
+            func: async (input: string) => {
+                try {
+                    let language = 'javascript';
+                    let code = input;
+
+                    const trimmed = typeof input === 'string' ? input.trim() : '';
+                    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+                        try {
+                            const parsed = JSON.parse(trimmed);
+                            if (parsed && typeof parsed === 'object') {
+                                if (typeof parsed.language === 'string') language = parsed.language;
+                                if (typeof parsed.code === 'string') code = parsed.code;
+                            }
+                        } catch {
+                            // ignore JSON parse errors; treat as raw JS
+                        }
+                    }
+
+                    language = String(language || '').toLowerCase();
+                    if (!allowedLanguages.map(l => String(l).toLowerCase()).includes(language)) {
+                        return `Error: language '${language}' is not allowed. Allowed: ${allowedLanguages.join(', ')}`;
+                    }
+
+                    if (language === 'typescript') {
+                        // Execute as JS for now; TS support would require ts-node/tsx; keep safe and minimal.
+                        language = 'javascript';
+                    }
+
+                    if (language === 'python') {
+                        const out = execSync(`${pythonCommand} -`, {
+                            cwd: this.projectRoot,
+                            input: code,
+                            timeout: timeoutMs,
+                            maxBuffer: 10 * 1024 * 1024
+                        });
+                        return out.toString();
+                    }
+
+                    // javascript
+                    const wrapped = `"use strict";
+try {
+  const __result = (async () => ( ${code}
+  ))();
+  Promise.resolve(__result).then(r => {
+    if (typeof r === "string") process.stdout.write(r);
+    else process.stdout.write(JSON.stringify(r));
+  }).catch(e => {
+    process.stderr.write(String(e && e.stack ? e.stack : e));
+    process.exit(1);
+  });
+} catch (e) {
+  process.stderr.write(String(e && e.stack ? e.stack : e));
+  process.exit(1);
+}
+`;
+
+                    const out = execSync('node -', {
+                        cwd: this.projectRoot,
+                        input: wrapped,
+                        timeout: timeoutMs,
+                        maxBuffer: 10 * 1024 * 1024
+                    });
+                    return out.toString();
+                } catch (e: any) {
+                    return `Error: ${e.message}`;
+                }
+            }
+        });
     }
 
     /**
@@ -403,6 +518,75 @@ export class ToolRegistry {
      */
     static getAllTools(): ToolConfig[] {
         return Array.from(this.tools.values());
+    }
+
+    private static async getAgentToolRows(agentId: number): Promise<Array<{ tool_name: string; tool_category: string; is_active: any; config: any }>> {
+        const rows = await executeQuery(
+            'SELECT tool_name, tool_category, is_active, config FROM agent_tools WHERE agent_id = ?',
+            [agentId]
+        );
+        if (!Array.isArray(rows)) return [];
+        return rows as any;
+    }
+
+    static async getToolCatalogForAgent(agentId: number): Promise<ToolCatalogItem[]> {
+        const builtIns = Array.from(this.tools.values());
+        const agentRows = await this.getAgentToolRows(agentId);
+        const agentByName = new Map<string, { category: string; isActive: boolean; config: Record<string, any> }>();
+
+        for (const row of agentRows) {
+            agentByName.set(row.tool_name, {
+                category: row.tool_category,
+                isActive: Boolean(row.is_active),
+                config: typeof row.config === 'string' ? JSON.parse(row.config) : (row.config || {})
+            });
+        }
+
+        const catalog: ToolCatalogItem[] = [];
+
+        for (const tool of builtIns) {
+            const agentOverride = agentByName.get(tool.name);
+            catalog.push({
+                name: tool.name,
+                category: agentOverride?.category || tool.category,
+                description: tool.description,
+                isActive: agentOverride ? agentOverride.isActive : false,
+                config: {
+                    ...(tool.config || {}),
+                    ...(agentOverride?.config || {})
+                },
+                source: agentOverride ? 'agent_tools' : 'built_in',
+                agentId
+            });
+            agentByName.delete(tool.name);
+        }
+
+        for (const [toolName, row] of agentByName.entries()) {
+            catalog.push({
+                name: toolName,
+                category: row.category,
+                description: 'Custom tool',
+                isActive: row.isActive,
+                config: row.config,
+                source: 'agent_tools',
+                agentId
+            });
+        }
+
+        return catalog;
+    }
+
+    static async getAgentToolEffectiveConfig(agentId: number, toolName: string): Promise<{ isActive: boolean; config: Record<string, any> } | null> {
+        const rows = await executeQuery(
+            'SELECT tool_name, is_active, config FROM agent_tools WHERE agent_id = ? AND tool_name = ? LIMIT 1',
+            [agentId, toolName]
+        );
+        if (!Array.isArray(rows) || rows.length === 0) return null;
+        const row: any = rows[0];
+        return {
+            isActive: Boolean(row.is_active),
+            config: typeof row.config === 'string' ? JSON.parse(row.config) : (row.config || {})
+        };
     }
 
     /**

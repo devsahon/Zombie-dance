@@ -27,6 +27,7 @@ const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Models", href: "/models", icon: Server },
   { name: "Ollama Models", href: "/ollama-models", icon: Server },
+  { name: "GGUF Models", href: "/gguf-models", icon: Server },
   { name: "Agents", href: "/agents", icon: Bot },
   { name: "Servers", href: "/servers", icon: Server },
   { name: "Memory", href: "/memory", icon: Database },

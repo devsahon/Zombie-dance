@@ -1,5 +1,6 @@
 import winston from 'winston';
 import path from 'path';
+import fs from 'fs';
 
 // Safe stringify function to handle circular references
 function safeStringify(obj: any): string {
@@ -11,7 +12,7 @@ function safeStringify(obj: any): string {
         return '[Circular]';
       }
       seen.add(value);
-      
+
       // Filter out known objects with circular references
       if (value instanceof Error) {
         return {
@@ -20,12 +21,12 @@ function safeStringify(obj: any): string {
           stack: value.stack
         };
       }
-      
+
       // Filter out objects that typically have circular references
-      if (value.constructor?.name === 'Socket' || 
-          value.constructor?.name === 'IncomingMessage' ||
-          value.constructor?.name === 'ServerResponse' ||
-          value.parser?.constructor?.name === 'HTTPParser') {
+      if (value.constructor?.name === 'Socket' ||
+        value.constructor?.name === 'IncomingMessage' ||
+        value.constructor?.name === 'ServerResponse' ||
+        value.parser?.constructor?.name === 'HTTPParser') {
         return '[Object with circular reference]';
       }
     }
@@ -35,6 +36,12 @@ function safeStringify(obj: any): string {
 
 // Create singleton logger instance
 const logDir = path.join(process.cwd(), 'logs');
+
+try {
+  fs.mkdirSync(logDir, { recursive: true });
+} catch {
+  // ignore
+}
 
 const singletonLogger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
@@ -65,7 +72,7 @@ const singletonLogger = winston.createLogger({
         })
       )
     }),
-    
+
     // Write error logs to file
     new winston.transports.File({
       filename: path.join(logDir, 'error.log'),
@@ -75,7 +82,7 @@ const singletonLogger = winston.createLogger({
         winston.format.json()
       )
     }),
-    
+
     // Write all logs to file
     new winston.transports.File({
       filename: path.join(logDir, 'combined.log'),

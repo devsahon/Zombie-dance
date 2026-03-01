@@ -34,12 +34,27 @@ function requireApiKey(req: express.Request, res: express.Response, next: expres
 
 router.get('/tools', async (req, res) => {
   try {
+    const agentIdRaw = req.query.agentId;
+    const numericAgentId = typeof agentIdRaw === 'string' ? parseInt(agentIdRaw, 10) : NaN;
+
+    if (!Number.isNaN(numericAgentId)) {
+      const tools = await ToolRegistry.getToolCatalogForAgent(numericAgentId);
+      res.json({
+        success: true,
+        agentId: numericAgentId,
+        tools,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
     const tools = ToolRegistry.getAllTools().map(t => ({
       name: t.name,
       category: t.category,
       description: t.description,
-      isActive: t.isActive,
-      config: t.config
+      isActive: false,
+      config: t.config,
+      source: 'built_in'
     }));
 
     res.json({
@@ -62,7 +77,17 @@ router.get('/tools', async (req, res) => {
 
 router.post('/execute', requireApiKey, async (req, res) => {
   try {
-    const { toolName, input, configOverride } = req.body || {};
+    const { agentId, toolName, input, configOverride } = req.body || {};
+
+    const numericAgentId = typeof agentId === 'number' ? agentId : parseInt(String(agentId || ''), 10);
+    if (Number.isNaN(numericAgentId)) {
+      res.status(400).json({
+        success: false,
+        error: 'agentId is required and must be a numeric ID',
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
 
     if (!toolName || typeof toolName !== 'string') {
       res.status(400).json({
@@ -74,11 +99,36 @@ router.post('/execute', requireApiKey, async (req, res) => {
     }
 
     const toolConfig = ToolRegistry.getTool(toolName);
-    if (!toolConfig || !toolConfig.isActive) {
+    const agentTool = await ToolRegistry.getAgentToolEffectiveConfig(numericAgentId, toolName);
+    if (!agentTool || !agentTool.isActive) {
       res.status(404).json({
         success: false,
         error: 'Tool not found or inactive',
         toolName,
+        agentId: numericAgentId,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    if (!toolConfig) {
+      res.status(400).json({
+        success: false,
+        error: 'Tool is not a built-in executable tool',
+        toolName,
+        agentId: numericAgentId,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    const sensitiveTools = new Set(['shell_exec', 'file_read', 'file_write']);
+    if (sensitiveTools.has(toolName) && configOverride) {
+      res.status(400).json({
+        success: false,
+        error: 'configOverride is not allowed for this tool',
+        toolName,
+        agentId: numericAgentId,
         timestamp: new Date().toISOString()
       });
       return;
@@ -86,6 +136,7 @@ router.post('/execute', requireApiKey, async (req, res) => {
 
     const mergedConfig = {
       ...(toolConfig.config || {}),
+      ...(agentTool.config || {}),
       ...(configOverride && typeof configOverride === 'object' ? configOverride : {})
     };
 
@@ -117,6 +168,7 @@ router.post('/execute', requireApiKey, async (req, res) => {
     res.json({
       success: true,
       toolName,
+      agentId: numericAgentId,
       output,
       latency_ms: Date.now() - startedAt,
       timestamp: new Date().toISOString()

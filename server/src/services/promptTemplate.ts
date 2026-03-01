@@ -89,6 +89,38 @@ export class PromptTemplateService {
         return langMap[code] || code;
     }
 
+    private static buildResponseRules(agentConfig: AgentConfig): string[] {
+        const rules: string[] = [];
+        const langPrefs = agentConfig.config.language_preferences || {};
+        const primaryLanguage = langPrefs.primary_language || 'bn';
+
+        let template: any = undefined;
+        if (agentConfig.metadata && typeof agentConfig.metadata === 'object') {
+            const metadata = agentConfig.metadata as any;
+            if (metadata.response_template) {
+                template = typeof metadata.response_template === 'string'
+                    ? JSON.parse(metadata.response_template)
+                    : metadata.response_template;
+            }
+        }
+
+        if (template?.rules && Array.isArray(template.rules)) {
+            for (const r of template.rules) {
+                if (typeof r === 'string' && r.trim()) rules.push(r.trim());
+            }
+        } else {
+            rules.push(`Reply in ${this.getLanguageName(primaryLanguage)}.`);
+            rules.push('Never make up words or hallucinate.');
+            rules.push('Never identify as Alibaba, Qwen, LLaMA, or any other base AI model.');
+        }
+
+        if (typeof template?.max_sentences === 'number' && template.max_sentences > 0) {
+            rules.push(`Keep your response within ${template.max_sentences} sentences when possible.`);
+        }
+
+        return rules;
+    }
+
     /**
      * Build system identity section
      */
@@ -190,10 +222,9 @@ You are ${agentConfig.name}, a ${agentConfig.type} agent.`;
 
         // ===== RESPONSE RULES =====
         parts.push('[RESPONSE RULES]');
-        parts.push('- Reply in English only.');
-        parts.push('- Keep your response short (2-3 sentences).');
-        parts.push('- Never make up words or hallucinate.');
-        parts.push('- Never identify as Alibaba, Qwen, LLaMA, or any other base AI model.');
+        for (const rule of this.buildResponseRules(agentConfig)) {
+            parts.push(`- ${rule}`);
+        }
         parts.push('');
 
         // ===== USER QUESTION =====
@@ -250,8 +281,9 @@ You are ${agentConfig.name}, a ${agentConfig.type} agent.`;
 
         // ===== RULES =====
         parts.push('[RULES]');
-        parts.push('- Reply in English only.');
-        parts.push('- Keep it short (2-3 sentences).');
+        for (const rule of this.buildResponseRules(agentConfig)) {
+            parts.push(`- ${rule}`);
+        }
         parts.push('');
 
         parts.push(`[QUESTION]\n${userMessage}`);
@@ -286,9 +318,9 @@ You are ${agentConfig.name}, a ${agentConfig.type} agent.`;
 
         // ===== RULES =====
         parts.push('[RULES]');
-        parts.push('- Reply in English only.');
-        parts.push('- Keep it short (2-3 sentences).');
-        parts.push('- Never hallucinate or make up words.');
+        for (const rule of this.buildResponseRules(agentConfig)) {
+            parts.push(`- ${rule}`);
+        }
         parts.push('');
 
         // ===== QUESTION =====

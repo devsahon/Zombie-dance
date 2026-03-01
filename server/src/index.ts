@@ -16,6 +16,7 @@ import chatRoutes from './routes/chat';
 import modelsRoutes from './routes/models';
 import agentsRoutes from './routes/agents';
 import memoryRoutes from './routes/memory-new';
+import memoryDbRoutes from './routes/memory';
 import cliRoutes from './routes/cli';
 import editorRoutes from './routes/editor';
 import providersRoutes from './routes/providers';
@@ -24,6 +25,7 @@ import settingsRoutes from './routes/settings';
 import metricsRoutes from './routes/metrics';
 import promptTemplatesRoutes from './routes/prompt-templates';
 import mcpRoutes from './routes/mcp';
+import plansRoutes from './routes/plans';
 import { initializeMemoryRoutes } from './routes/memory-new';
 import { initializeCLIRoutes } from './routes/cli-new';
 
@@ -36,6 +38,7 @@ import { Logger } from './utils/logger';
 import { initializeDatabase } from './database/connection';
 import { MemoryService } from './services/memory';
 import { EmbeddingService } from './services/embedding';
+import { ensureAdminUserSeeded } from './services/adminSeed';
 
 const app = express();
 const server = createServer(app);
@@ -82,10 +85,12 @@ app.use('/status', statusRoutes);
 app.use('/chat', chatRoutes);
 app.use('/models', modelsRoutes);
 app.use('/agents', agentsRoutes);
-app.use('/memory', memoryRoutes);
+app.use('/memory', memoryDbRoutes);
+app.use('/memory-new', memoryRoutes);
 app.use('/cli-agent', cliRoutes);
 app.use('/editor', editorRoutes);
 app.use('/providers', providersRoutes);
+app.use('/plans', plansRoutes);
 app.use('/servers', serversRoutes);
 app.use('/settings', settingsRoutes);
 app.use('/metrics', metricsRoutes);
@@ -105,7 +110,8 @@ app.get('/', (req, res) => {
             chat: '/chat',
             models: '/models',
             agents: '/agents',
-            memory: '/memory-new',
+            memory: '/memory',
+            memoryNew: '/memory-new',
             cli: '/cli-agent',
             editor: '/editor',
             providers: '/providers',
@@ -149,6 +155,13 @@ server.listen(port, async () => {
             queueLimit: 0
         });
         logger.info('✅ Database connected successfully');
+
+        try {
+            await ensureAdminUserSeeded();
+            logger.info('✅ Admin seed check completed');
+        } catch (seedError) {
+            logger.warn('⚠️ Admin seed failed', seedError);
+        }
     } catch (error) {
         logger.warn('⚠️ Database connection failed - running in offline mode', error);
     }

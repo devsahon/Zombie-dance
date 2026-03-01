@@ -1,41 +1,37 @@
 import express from 'express';
 import { Logger } from '../utils/logger';
+import { executeQuery } from '../database/connection';
 
 const router = express.Router();
 const logger = new Logger();
 
-// Mock memory storage (in a real implementation, this would be a database)
-const memoryStorage = new Map<string, any>();
-
 // Get conversations
 router.get('/conversations', async (req, res) => {
     try {
-        // Mock conversation data
-        const conversations = [
-            {
-                id: 'conv-1',
-                name: 'General Chat',
-                messageCount: 15,
-                lastUpdated: new Date(Date.now() - 3600000).toISOString()
-            },
-            {
-                id: 'conv-2',
-                name: 'Code Review Session',
-                messageCount: 8,
-                lastUpdated: new Date(Date.now() - 7200000).toISOString()
-            },
-            {
-                id: 'conv-3',
-                name: 'Project Planning',
-                messageCount: 23,
-                lastUpdated: new Date(Date.now() - 86400000).toISOString()
-            }
-        ];
+        if (!(global as any).connection) {
+            return res.status(503).json({
+                success: false,
+                error: 'Database not available',
+                message: 'Memory conversations require a database connection',
+                timestamp: new Date().toISOString()
+            });
+        }
+
+        const rows: any[] = await executeQuery(
+            `SELECT
+                c.id,
+                COALESCE(c.title, CONCAT('Conversation ', c.id)) as name,
+                (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) as messageCount,
+                c.updated_at as lastUpdated
+             FROM conversations c
+             ORDER BY c.updated_at DESC
+             LIMIT 100`
+        );
 
         res.json({
             success: true,
-            conversations,
-            total: conversations.length,
+            conversations: rows,
+            total: rows.length,
             timestamp: new Date().toISOString()
         });
         return;
@@ -52,85 +48,45 @@ router.get('/conversations', async (req, res) => {
     }
 });
 
-// Get conversation messages
-router.get('/:conversationId', async (req, res) => {
-    try {
-        const { conversationId } = req.params;
-        const { limit = 100, offset = 0 } = req.query;
-
-        // Mock message data
-        const mockMessages = [
-            {
-                role: 'user',
-                content: 'Hello, can you help me with my project?',
-                timestamp: new Date(Date.now() - 3600000).toISOString()
-            },
-            {
-                role: 'assistant',
-                content: 'Of course! I\'d be happy to help you with your project. What specific aspect would you like assistance with?',
-                timestamp: new Date(Date.now() - 3600000 + 5000).toISOString()
-            },
-            {
-                role: 'user',
-                content: 'I need help setting up a database connection.',
-                timestamp: new Date(Date.now() - 3500000).toISOString()
-            },
-            {
-                role: 'assistant',
-                content: 'I can help you with database connections. What type of database are you working with? MySQL, PostgreSQL, or something else?',
-                timestamp: new Date(Date.now() - 3500000 + 8000).toISOString()
-            }
-        ];
-
-        const messages = mockMessages.slice(Number(offset), Number(offset) + Number(limit));
-
-        res.json({
-            success: true,
-            conversationId,
-            messages,
-            total: mockMessages.length,
-            limit: Number(limit),
-            offset: Number(offset),
-            timestamp: new Date().toISOString()
-        });
-        return;
-    } catch (error) {
-        logger.error(`Failed to get messages for conversation ${req.params.conversationId}:`, error);
-
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch conversation messages',
-            message: error instanceof Error ? error.message : 'Unknown error',
-            timestamp: new Date().toISOString()
-        });
-        return;
-    }
-});
-
 // Store data in memory
 router.post('/store', async (req, res) => {
     try {
-        const { key, value, ttl } = req.body;
+        const { agentId, key, value, ttl } = req.body;
 
-        if (!key || value === undefined) {
+        if (!agentId || !key || value === undefined) {
             return res.status(400).json({
                 success: false,
-                error: 'Key and value are required'
+                error: 'agentId, key and value are required'
             });
         }
 
-        const data = {
-            value,
-            createdAt: new Date().toISOString(),
-            expiresAt: ttl ? new Date(Date.now() + ttl * 1000).toISOString() : null
-        };
+        if (!(global as any).connection) {
+            return res.status(503).json({
+                success: false,
+                error: 'Database not available',
+                message: 'Memory store requires a database connection',
+                timestamp: new Date().toISOString()
+            });
+        }
 
-        memoryStorage.set(key, data);
+        const expiresAt = ttl ? new Date(Date.now() + Number(ttl) * 1000).toISOString() : null;
+        const metadata = { expiresAt };
+
+        await executeQuery(
+            `INSERT INTO agent_memory (agent_id, content_type, content, metadata, is_cached, cache_key)
+             VALUES (?, 'context', ?, ?, TRUE, ?)
+             ON DUPLICATE KEY UPDATE
+               content = VALUES(content),
+               metadata = VALUES(metadata),
+               is_cached = VALUES(is_cached),
+               updated_at = CURRENT_TIMESTAMP`,
+            [Number(agentId), JSON.stringify(value), JSON.stringify(metadata), key]
+        );
 
         res.json({
             success: true,
             key,
-            expiresAt: data.expiresAt,
+            expiresAt,
             timestamp: new Date().toISOString()
         });
         return;
@@ -152,9 +108,26 @@ router.get('/retrieve/:key', async (req, res) => {
     try {
         const { key } = req.params;
 
-        const data = memoryStorage.get(key);
+        if (!(global as any).connection) {
+            return res.status(503).json({
+                success: false,
+                error: 'Database not available',
+                message: 'Memory retrieve requires a database connection',
+                timestamp: new Date().toISOString()
+            });
+        }
 
-        if (!data) {
+        const rows: any[] = await executeQuery(
+            `SELECT id, content, metadata, created_at as createdAt
+             FROM agent_memory
+             WHERE cache_key = ?
+               AND is_cached = TRUE
+             ORDER BY updated_at DESC
+             LIMIT 1`,
+            [key]
+        );
+
+        if (!Array.isArray(rows) || rows.length === 0) {
             return res.status(404).json({
                 success: false,
                 error: 'Data not found',
@@ -162,9 +135,12 @@ router.get('/retrieve/:key', async (req, res) => {
             });
         }
 
-        // Check if data has expired
-        if (data.expiresAt && new Date(data.expiresAt) < new Date()) {
-            memoryStorage.delete(key);
+        const row = rows[0];
+        const metadata = row.metadata || null;
+        const expiresAt = metadata?.expiresAt || null;
+
+        if (expiresAt && new Date(expiresAt) < new Date()) {
+            await executeQuery('DELETE FROM agent_memory WHERE id = ?', [row.id]);
             return res.status(404).json({
                 success: false,
                 error: 'Data has expired',
@@ -172,12 +148,19 @@ router.get('/retrieve/:key', async (req, res) => {
             });
         }
 
+        let parsedValue: any = row.content;
+        try {
+            parsedValue = JSON.parse(row.content);
+        } catch {
+            parsedValue = row.content;
+        }
+
         res.json({
             success: true,
             key,
-            value: data.value,
-            createdAt: data.createdAt,
-            expiresAt: data.expiresAt,
+            value: parsedValue,
+            createdAt: row.createdAt,
+            expiresAt,
             timestamp: new Date().toISOString()
         });
         return;
@@ -206,29 +189,45 @@ router.post('/search', async (req, res) => {
             });
         }
 
-        const results = [];
-
-        // Simple search implementation
-        for (const [key, data] of memoryStorage.entries()) {
-            if (key.toLowerCase().includes(query.toLowerCase()) ||
-                JSON.stringify(data.value).toLowerCase().includes(query.toLowerCase())) {
-                results.push({
-                    key,
-                    value: data.value,
-                    relevance: 0.95, // Mock relevance score
-                    createdAt: data.createdAt
-                });
-            }
+        if (!(global as any).connection) {
+            return res.status(503).json({
+                success: false,
+                error: 'Database not available',
+                message: 'Memory search requires a database connection',
+                timestamp: new Date().toISOString()
+            });
         }
 
-        // Sort by relevance and limit results
-        const limitedResults = results
-            .sort((a, b) => b.relevance - a.relevance)
-            .slice(0, Number(limit));
+        const q = `%${query}%`;
+        const rows: any[] = await executeQuery(
+            `SELECT cache_key as \`key\`, content, metadata, created_at as createdAt
+             FROM agent_memory
+             WHERE is_cached = TRUE
+               AND cache_key IS NOT NULL
+               AND (cache_key LIKE ? OR content LIKE ?)
+             ORDER BY updated_at DESC
+             LIMIT ?`,
+            [q, q, Number(limit)]
+        );
+
+        const results = rows.map(r => {
+            let val: any = r.content;
+            try {
+                val = JSON.parse(r.content);
+            } catch {
+                val = r.content;
+            }
+
+            return {
+                key: r.key,
+                value: val,
+                createdAt: r.createdAt
+            };
+        });
 
         res.json({
             success: true,
-            results: limitedResults,
+            results,
             total: results.length,
             query,
             timestamp: new Date().toISOString()
@@ -247,13 +246,141 @@ router.post('/search', async (req, res) => {
     }
 });
 
-// Delete data from memory
-router.delete('/:conversationId', async (req, res) => {
+// Get conversation messages
+router.get('/conversations/:conversationId', async (req, res) => {
+    try {
+        const { conversationId } = req.params;
+        const { limit = 100, offset = 0 } = req.query;
+
+        if (!(global as any).connection) {
+            return res.status(503).json({
+                success: false,
+                error: 'Database not available',
+                message: 'Conversation messages require a database connection',
+                timestamp: new Date().toISOString()
+            });
+        }
+
+        const totalRows: any[] = await executeQuery(
+            'SELECT COUNT(*) as total FROM messages WHERE conversation_id = ?',
+            [conversationId]
+        );
+        const total = Array.isArray(totalRows) && totalRows.length > 0 ? Number(totalRows[0].total) : 0;
+
+        const rows: any[] = await executeQuery(
+            `SELECT
+                sender_type as role,
+                content,
+                created_at as timestamp
+             FROM messages
+             WHERE conversation_id = ?
+             ORDER BY created_at ASC
+             LIMIT ? OFFSET ?`,
+            [conversationId, Number(limit), Number(offset)]
+        );
+
+        res.json({
+            success: true,
+            conversationId,
+            messages: rows,
+            total,
+            limit: Number(limit),
+            offset: Number(offset),
+            timestamp: new Date().toISOString()
+        });
+        return;
+    } catch (error) {
+        logger.error(`Failed to get messages for conversation ${req.params.conversationId}:`, error);
+
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch conversation messages',
+            message: error instanceof Error ? error.message : 'Unknown error',
+            timestamp: new Date().toISOString()
+        });
+        return;
+    }
+});
+
+// Backwards-compatible alias (kept last to avoid route shadowing)
+router.get('/:conversationId', async (req, res) => {
+    try {
+        const { conversationId } = req.params;
+        const { limit = 100, offset = 0 } = req.query;
+
+        if (!(global as any).connection) {
+            return res.status(503).json({
+                success: false,
+                error: 'Database not available',
+                message: 'Conversation messages require a database connection',
+                timestamp: new Date().toISOString()
+            });
+        }
+
+        const totalRows: any[] = await executeQuery(
+            'SELECT COUNT(*) as total FROM messages WHERE conversation_id = ?',
+            [conversationId]
+        );
+        const total = Array.isArray(totalRows) && totalRows.length > 0 ? Number(totalRows[0].total) : 0;
+
+        const rows: any[] = await executeQuery(
+            `SELECT
+                sender_type as role,
+                content,
+                created_at as timestamp
+             FROM messages
+             WHERE conversation_id = ?
+             ORDER BY created_at ASC
+             LIMIT ? OFFSET ?`,
+            [conversationId, Number(limit), Number(offset)]
+        );
+
+        res.json({
+            success: true,
+            conversationId,
+            messages: rows,
+            total,
+            limit: Number(limit),
+            offset: Number(offset),
+            timestamp: new Date().toISOString()
+        });
+        return;
+    } catch (error) {
+        logger.error(`Failed to get messages for conversation ${req.params.conversationId}:`, error);
+
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch conversation messages',
+            message: error instanceof Error ? error.message : 'Unknown error',
+            timestamp: new Date().toISOString()
+        });
+        return;
+    }
+});
+
+// Delete conversation
+router.delete('/conversations/:conversationId', async (req, res) => {
     try {
         const { conversationId } = req.params;
 
-        // In a real implementation, this would delete from database
-        // For now, we'll just return success
+        if (!(global as any).connection) {
+            return res.status(503).json({
+                success: false,
+                error: 'Database not available',
+                message: 'Conversation delete requires a database connection',
+                timestamp: new Date().toISOString()
+            });
+        }
+
+        const result: any = await executeQuery('DELETE FROM conversations WHERE id = ?', [conversationId]);
+        if ((result as any).affectedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Conversation not found',
+                conversationId,
+                timestamp: new Date().toISOString()
+            });
+        }
 
         res.json({
             success: true,

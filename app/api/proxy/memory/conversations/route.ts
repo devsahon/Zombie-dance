@@ -18,42 +18,35 @@ export async function GET() {
     })
 
     if (!response.ok) {
-      console.error("[v0] Conversations API error:", response.status, response.statusText)
-      // Return fallback data for development
-      return NextResponse.json([
+      const text = await response.text()
+      let payload: any = null
+      try {
+        payload = text ? JSON.parse(text) : null
+      } catch {
+        payload = null
+      }
+
+      return NextResponse.json(
         {
-          id: "conv-1",
-          name: "Code Generation Session",
-          messageCount: 5,
-          lastUpdated: new Date().toISOString()
+          success: false,
+          error: payload?.error || "Failed to fetch conversations",
+          message: payload?.message || response.statusText,
         },
-        {
-          id: "conv-2",
-          name: "Debugging Session",
-          messageCount: 3,
-          lastUpdated: new Date(Date.now() - 3600000).toISOString()
-        },
-        {
-          id: "conv-3",
-          name: "Architecture Discussion",
-          messageCount: 7,
-          lastUpdated: new Date(Date.now() - 7200000).toISOString()
-        }
-      ])
+        { status: response.status },
+      )
     }
 
     const data = await response.json()
     return NextResponse.json(data)
   } catch (error) {
     console.error("[v0] Conversations fetch error:", error)
-    // Return fallback data
-    return NextResponse.json([
+    return NextResponse.json(
       {
-        id: "conv-1",
-        name: "Code Generation Session",
-        messageCount: 5,
-        lastUpdated: new Date().toISOString()
-      }
-    ])
+        success: false,
+        error: "Internal server error",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
   }
 }

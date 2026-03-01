@@ -32,9 +32,12 @@ export async function initializeDatabase(config: DatabaseConfig): Promise<mysql.
         logger.info('Successfully connected to MySQL database');
         connection.release();
 
+        (global as any).connection = true;
+
         return pool;
     } catch (error) {
         logger.error('Failed to connect to MySQL database:', error);
+        (global as any).connection = false;
         throw error;
     }
 }
@@ -57,6 +60,7 @@ export async function executeQuery(sql: string, values?: any[]): Promise<any> {
 }
 
 export async function closeDatabase(): Promise<void> {
+    (global as any).connection = false;
     if (pool) {
         await pool.end();
         logger.info('Database connection pool closed');

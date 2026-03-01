@@ -4,13 +4,21 @@ import dotenv from 'dotenv';
 // Load environment variables
 dotenv.config({ path: '.env' });
 
+function requireEnv(name: string): string {
+  const v = (process.env[name] || '').trim();
+  if (!v) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return v;
+}
+
 async function populateModels() {
   try {
     // Initialize database connection using environment variables
     const config = {
       host: process.env.DB_HOST || 'localhost',
-      user: process.env.DB_USER || 'u-root',
-      password: process.env.DB_PASSWORD || 'p-105585',
+      user: requireEnv('DB_USER'),
+      password: requireEnv('DB_PASSWORD'),
       database: process.env.DB_NAME || 'uas_admin',
       waitForConnections: true,
       connectionLimit: 10,
@@ -20,72 +28,55 @@ async function populateModels() {
     await initializeDatabase(config);
     console.log('Database connection initialized');
 
-    // Check if provider exists
-    const providers = await executeQuery(
-      `SELECT id FROM ai_providers WHERE name = ?`,
-      ['Ollama Local']
+    const providerName = (process.env.OLLAMA_PROVIDER_NAME || 'Ollama Local').trim();
+    const providerEndpoint = (process.env.OLLAMA_URL || 'http://localhost:11434').trim();
+
+    // Ensure provider exists (idempotent)
+    await executeQuery(
+      `INSERT INTO ai_providers (name, type, api_endpoint, is_active)
+       VALUES (?, 'ollama', ?, TRUE)
+       ON DUPLICATE KEY UPDATE
+         type = VALUES(type),
+         api_endpoint = VALUES(api_endpoint),
+         is_active = VALUES(is_active),
+         updated_at = CURRENT_TIMESTAMP`,
+      [providerName, providerEndpoint]
     );
 
-    let providerId;
-    if (providers.length > 0) {
-      providerId = providers[0].id;
-      console.log(`Provider already exists: Ollama Local (ID: ${providerId})`);
-    } else {
-      // Create a provider for Ollama
-      const providerResult = await executeQuery(
-        `INSERT INTO ai_providers (name, type, api_endpoint, is_active) 
-         VALUES (?, ?, ?, ?)`,
-        ['Ollama Local', 'ollama', 'http://localhost:11434', true]
-      );
-      providerId = (providerResult as any).insertId;
-      console.log(`Created provider: Ollama Local (ID: ${providerId})`);
+    const providers: any[] = await executeQuery(
+      `SELECT id FROM ai_providers WHERE name = ? LIMIT 1`,
+      [providerName]
+    );
+    if (!Array.isArray(providers) || providers.length === 0) {
+      throw new Error('Failed to resolve provider id after upsert');
     }
 
-    // Check if model already exists
-    const models = await executeQuery(
-      `SELECT id FROM ai_models WHERE provider_id = ? AND model_name = ?`,
-      [providerId, 'qwen2.5:1.5b']
+    const providerId = providers[0].id;
+    console.log(`Provider ready: ${providerName} (ID: ${providerId})`);
+
+    const modelName = (process.env.OLLAMA_DEFAULT_MODEL || 'qwen2.5-coder:1.5b').trim();
+    const modelVersion = (process.env.OLLAMA_DEFAULT_MODEL_VERSION || '1.5b').trim();
+
+    const modelMetadata = {
+      family: process.env.OLLAMA_DEFAULT_MODEL_FAMILY || 'qwen2.5',
+      parameter_size: modelVersion,
+      quantization_level: process.env.OLLAMA_DEFAULT_MODEL_QUANT || null,
+      size: process.env.OLLAMA_DEFAULT_MODEL_SIZE ? Number(process.env.OLLAMA_DEFAULT_MODEL_SIZE) : null
+    };
+
+    const result: any = await executeQuery(
+      `INSERT INTO ai_models (provider_id, model_name, model_version, status, cpu_usage, memory_usage, requests_handled, last_response_time, total_tokens_used, metadata)
+       VALUES (?, ?, ?, 'running', 0.00, 0.00, 0, 0, 0, ?)
+       ON DUPLICATE KEY UPDATE
+         model_version = VALUES(model_version),
+         status = VALUES(status),
+         metadata = VALUES(metadata),
+         updated_at = CURRENT_TIMESTAMP`,
+      [providerId, modelName, modelVersion, JSON.stringify(modelMetadata)]
     );
 
-    if (models.length > 0) {
-      console.log('Model already exists: qwen2.5:1.5b');
-    } else {
-      // Create models
-      const modelData = {
-        model_name: 'qwen2.5:1.5b',
-        model_version: '1.5b',
-        status: 'running',
-        cpu_usage: 0.00,
-        memory_usage: 0.00,
-        requests_handled: 0,
-        last_response_time: 0,
-        total_tokens_used: 0,
-        metadata: JSON.stringify({
-          family: 'qwen2',
-          parameter_size: '1.5B',
-          quantization_level: 'Q4_K_M',
-          size: 986061892
-        })
-      };
-
-      const result = await executeQuery(
-        `INSERT INTO ai_models (provider_id, model_name, model_version, status, cpu_usage, memory_usage, requests_handled, last_response_time, total_tokens_used, metadata) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          providerId,
-          modelData.model_name,
-          modelData.model_version,
-          modelData.status,
-          modelData.cpu_usage,
-          modelData.memory_usage,
-          modelData.requests_handled,
-          modelData.last_response_time,
-          modelData.total_tokens_used,
-          modelData.metadata
-        ]
-      );
-      console.log(`Created model: ${modelData.model_name} (ID: ${(result as any).insertId})`);
-    }
+    const id = result?.insertId || null;
+    console.log(`Upserted model: ${modelName}${id ? ` (ID: ${id})` : ''}`);
 
     console.log('All models created successfully!');
   } catch (error) {

@@ -9,9 +9,8 @@
  * - OpenAI-standard output format
  */
 
-import { DynamicTool, Tool } from '@langchain/core/tools';
 import { OllamaService } from './ollama';
-import { ToolRegistry, LangChainToolFactory } from './toolRegistry';
+import { DynamicTool, Tool, ToolRegistry, LangChainToolFactory } from './toolRegistry';
 import { executeQuery } from '../database/connection';
 import { Logger } from '../utils/logger';
 

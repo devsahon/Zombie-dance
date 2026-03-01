@@ -97,7 +97,7 @@ async function populateDemoData() {
             { providerId: providerIds[0], name: 'neural-chat', version: '7b', status: 'running' },
             { providerId: providerIds[1], name: 'gpt-4', version: '1106-preview', status: 'running' },
             { providerId: providerIds[1], name: 'gpt-3.5-turbo', version: 'latest', status: 'running' },
-            { providerId: providerIds[2], name: 'gemini-pro', version: 'latest', status: 'running' },
+            { providerId: providerIds[2], name: 'ZombieCoder-pro', version: 'latest', status: 'running' },
             { providerId: providerIds[3], name: 'orca-mini', version: '3b', status: 'stopped' }
         ];
 

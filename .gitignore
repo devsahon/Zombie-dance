@@ -44,3 +44,17 @@ coverage/
 *.tmp
 *.temp
 *.bak
+
+# Project work artifacts (keep out of git)
+work/
+docs/work/
+server/data/
+package/
+ex_ui/
+
+# Archives & dumps
+*.zip
+*.sql
+
+# Local exports
+*.html

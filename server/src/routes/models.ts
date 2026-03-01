@@ -10,6 +10,15 @@ const logger = new Logger();
 // Get all models (from database with provider info)
 router.get('/', async (req, res) => {
     try {
+        if (!(global as any).connection) {
+            return res.status(503).json({
+                success: false,
+                error: 'Database not available',
+                message: 'Models listing requires a database connection',
+                timestamp: new Date().toISOString()
+            });
+        }
+
         // Try to fetch from database
         const models = await executeQuery(`
             SELECT 
@@ -42,49 +51,119 @@ router.get('/', async (req, res) => {
         });
         return;
     } catch (error) {
-        logger.error('Failed to get models from database, falling back to Ollama:', error);
-        
-        // Fallback to Ollama if database fails
-        try {
-            const models = await ollamaService.getModels();
+        logger.error('Failed to get models from database:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch models',
+            message: error instanceof Error ? error.message : 'Unknown error',
+            timestamp: new Date().toISOString()
+        });
+        return;
+    }
+});
 
-            const modelsList = models.map(model => ({
-                name: model.name,
-                model: model.model,
-                size: model.size,
-                modified: model.modified_at,
-                digest: model.digest,
-                details: {
-                    format: model.details.format,
-                    family: model.details.family,
-                    parameterSize: model.details.parameter_size,
-                    quantizationLevel: model.details.quantization_level
-                }
-            }));
-
-            res.json({
-                success: true,
-                data: modelsList,
-                count: models.length,
-                source: 'ollama',
-                timestamp: new Date().toISOString()
-            });
-        } catch (ollamaError) {
-            logger.error('Failed to get models from Ollama:', ollamaError);
-            res.status(500).json({
+// Sync models from Ollama into DB (no simulation; reconciles real state)
+router.post('/sync', async (req, res) => {
+    try {
+        if (!(global as any).connection) {
+            return res.status(503).json({
                 success: false,
-                error: 'Failed to fetch models',
-                message: ollamaError instanceof Error ? ollamaError.message : 'Unknown error',
+                error: 'Database not available',
+                message: 'Model sync requires a database connection',
                 timestamp: new Date().toISOString()
             });
-            return;
         }
+
+        const providerName = (process.env.OLLAMA_PROVIDER_NAME || 'Ollama Local').trim();
+        const providerEndpoint = (process.env.OLLAMA_URL || 'http://localhost:11434').trim();
+
+        await executeQuery(
+            `INSERT INTO ai_providers (name, type, api_endpoint, is_active)
+             VALUES (?, 'ollama', ?, TRUE)
+             ON DUPLICATE KEY UPDATE
+               type = VALUES(type),
+               api_endpoint = VALUES(api_endpoint),
+               is_active = VALUES(is_active),
+               updated_at = CURRENT_TIMESTAMP`,
+            [providerName, providerEndpoint]
+        );
+
+        const providers: any[] = await executeQuery('SELECT id FROM ai_providers WHERE name = ? LIMIT 1', [providerName]);
+        if (!Array.isArray(providers) || providers.length === 0) {
+            throw new Error('Failed to resolve provider id for Ollama provider');
+        }
+        const providerId = providers[0].id;
+
+        const opResult: any = await executeQuery(
+            `INSERT INTO ai_model_operations (provider_id, operation, status, request_payload, started_at)
+             VALUES (?, 'sync', 'running', JSON_OBJECT('provider', ?, 'endpoint', ?), NOW())`,
+            [providerId, providerName, providerEndpoint]
+        );
+        const opId = opResult?.insertId;
+
+        const ollamaModels = await ollamaService.getModels();
+
+        let upserted = 0;
+        for (const m of ollamaModels) {
+            const metadata = {
+                digest: m.digest,
+                size: m.size,
+                modified_at: m.modified_at,
+                details: m.details
+            };
+
+            await executeQuery(
+                `INSERT INTO ai_models (provider_id, model_name, model_version, status, metadata)
+                 VALUES (?, ?, NULL, 'running', ?)
+                 ON DUPLICATE KEY UPDATE
+                   status = VALUES(status),
+                   metadata = VALUES(metadata),
+                   updated_at = CURRENT_TIMESTAMP`,
+                [providerId, m.name, JSON.stringify(metadata)]
+            );
+            upserted++;
+        }
+
+        if (opId) {
+            await executeQuery(
+                `UPDATE ai_model_operations
+                 SET status = 'success', completed_at = NOW(), result_payload = JSON_OBJECT('upserted', ?)
+                 WHERE id = ?`,
+                [upserted, opId]
+            );
+        }
+
+        res.json({
+            success: true,
+            message: 'Models synced from Ollama into database',
+            upserted,
+            timestamp: new Date().toISOString()
+        });
+        return;
+    } catch (error) {
+        logger.error('Model sync failed:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Model sync failed',
+            message: error instanceof Error ? error.message : 'Unknown error',
+            timestamp: new Date().toISOString()
+        });
+        return;
     }
 });
 
 // POST create new model
 router.post('/', async (req, res) => {
     try {
+        if (!(global as any).connection) {
+            return res.status(503).json({
+                success: false,
+                error: 'Database not available',
+                message: 'Cannot create model when running without database',
+                timestamp: new Date().toISOString()
+            });
+        }
+
         const { provider_id, model_name, model_version, status, metadata } = req.body;
 
         if (!provider_id || !model_name) {
@@ -121,6 +200,15 @@ router.post('/', async (req, res) => {
 // PUT update model
 router.put('/:id', async (req, res) => {
     try {
+        if (!(global as any).connection) {
+            return res.status(503).json({
+                success: false,
+                error: 'Database not available',
+                message: 'Cannot update model when running without database',
+                timestamp: new Date().toISOString()
+            });
+        }
+
         const { id } = req.params;
         const { status, cpu_usage, memory_usage, requests_handled, metadata } = req.body;
 
@@ -157,6 +245,15 @@ router.put('/:id', async (req, res) => {
 // DELETE model
 router.delete('/:id', async (req, res) => {
     try {
+        if (!(global as any).connection) {
+            return res.status(503).json({
+                success: false,
+                error: 'Database not available',
+                message: 'Cannot delete model when running without database',
+                timestamp: new Date().toISOString()
+            });
+        }
+
         const { id } = req.params;
 
         const result = await executeQuery('DELETE FROM ai_models WHERE id = ?', [id]);
@@ -190,6 +287,15 @@ router.delete('/:id', async (req, res) => {
 // GET models by provider
 router.get('/provider/:providerId', async (req, res) => {
     try {
+        if (!(global as any).connection) {
+            return res.status(503).json({
+                success: false,
+                error: 'Database not available',
+                message: 'Cannot fetch models by provider when running without database',
+                timestamp: new Date().toISOString()
+            });
+        }
+
         const { providerId } = req.params;
 
         const models = await executeQuery(`

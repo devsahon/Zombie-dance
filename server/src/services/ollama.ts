@@ -267,7 +267,12 @@ export class OllamaService {
         }
     }
 
-    async generate(prompt: string, model?: string, agentConfig?: AgentConfig): Promise<string> {
+    async generate(
+        prompt: string,
+        model?: string,
+        agentConfig?: AgentConfig,
+        overrides?: { baseURL?: string; timeoutMs?: number; preferStreaming?: boolean }
+    ): Promise<string> {
         try {
             // Use PromptTemplateService for better prompt generation
             let fullPrompt: string;
@@ -277,8 +282,23 @@ export class OllamaService {
                 fullPrompt = this.buildFullPrompt(prompt, agentConfig);
             }
 
+            const resolvedBaseURL = (typeof overrides?.baseURL === 'string' && overrides.baseURL.trim())
+                ? overrides.baseURL.trim().replace(/\/+$/, '')
+                : this.baseURL;
+            const resolvedTimeoutMs = typeof overrides?.timeoutMs === 'number' ? overrides.timeoutMs : 180000;
+            const preferStreaming = Boolean(overrides?.preferStreaming);
+
+            if (preferStreaming) {
+                return await this.streamGenerate(
+                    fullPrompt,
+                    model || agentConfig?.config?.model || this.defaultModel,
+                    undefined,
+                    { baseURL: resolvedBaseURL, timeoutMs: resolvedTimeoutMs }
+                );
+            }
+
             const response: AxiosResponse<GenerateResponse> = await axios.post(
-                `${this.baseURL}/api/generate`,
+                `${resolvedBaseURL}/api/generate`,
                 {
                     model: model || agentConfig?.config?.model || this.defaultModel,
                     prompt: fullPrompt,
@@ -291,7 +311,7 @@ export class OllamaService {
                     }
                 },
                 {
-                    timeout: 180000 // 180 seconds timeout for complex prompts
+                    timeout: resolvedTimeoutMs
                 }
             );
 
@@ -302,7 +322,12 @@ export class OllamaService {
         }
     }
 
-    async chat(messages: ChatMessage[], model?: string, agentConfig?: AgentConfig): Promise<string> {
+    async chat(
+        messages: ChatMessage[],
+        model?: string,
+        agentConfig?: AgentConfig,
+        overrides?: { baseURL?: string; timeoutMs?: number; preferStreaming?: boolean }
+    ): Promise<string> {
         try {
             // Use PromptTemplateService for better chat prompt
             let allMessages = messages;
@@ -320,8 +345,13 @@ export class OllamaService {
                 ];
             }
 
+            const resolvedBaseURL = (typeof overrides?.baseURL === 'string' && overrides.baseURL.trim())
+                ? overrides.baseURL.trim().replace(/\/+$/, '')
+                : this.baseURL;
+            const resolvedTimeoutMs = typeof overrides?.timeoutMs === 'number' ? overrides.timeoutMs : 60000;
+
             const response: AxiosResponse<ChatResponse> = await axios.post(
-                `${this.baseURL}/api/chat`,
+                `${resolvedBaseURL}/api/chat`,
                 {
                     model: model || agentConfig?.config?.model || this.defaultModel,
                     messages: allMessages,
@@ -334,7 +364,7 @@ export class OllamaService {
                     }
                 },
                 {
-                    timeout: 60000
+                    timeout: resolvedTimeoutMs
                 }
             );
 
@@ -345,10 +375,20 @@ export class OllamaService {
         }
     }
 
-    async streamGenerate(prompt: string, model?: string, onChunk?: (chunk: string) => void): Promise<string> {
+    async streamGenerate(
+        prompt: string,
+        model?: string,
+        onChunk?: (chunk: string) => void,
+        overrides?: { baseURL?: string; timeoutMs?: number }
+    ): Promise<string> {
         try {
+            const resolvedBaseURL = (typeof overrides?.baseURL === 'string' && overrides.baseURL.trim())
+                ? overrides.baseURL.trim().replace(/\/+$/, '')
+                : this.baseURL;
+            const resolvedTimeoutMs = typeof overrides?.timeoutMs === 'number' ? overrides.timeoutMs : 60000;
+
             const response = await axios.post(
-                `${this.baseURL}/api/generate`,
+                `${resolvedBaseURL}/api/generate`,
                 {
                     model: model || this.defaultModel,
                     prompt: prompt,
@@ -356,7 +396,7 @@ export class OllamaService {
                 },
                 {
                     responseType: 'stream',
-                    timeout: 60000
+                    timeout: resolvedTimeoutMs
                 }
             );
 

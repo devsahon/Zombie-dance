@@ -6,7 +6,8 @@ export class EmbeddingService {
     private ollamaService: OllamaService;
     private memoryService: MemoryService;
     private logger: Logger;
-    private embeddingModel: string = 'nomic-embed-text:latest';
+    private embeddingModel: string = process.env.EMBEDDING_MODEL || 'Xenova/all-MiniLM-L6-v2';
+    private embedderPromise: Promise<any> | null = null;
 
     constructor(ollamaService: OllamaService, memoryService: MemoryService) {
         this.ollamaService = ollamaService;
@@ -16,34 +17,20 @@ export class EmbeddingService {
 
     async generateEmbedding(text: string): Promise<Buffer> {
         try {
-            const response = await fetch(`${this.ollamaService.getOllamaUrl()}/api/embeddings`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    model: this.embeddingModel,
-                    prompt: text,
-                }),
-            });
+            const embedder = await this.getLocalEmbedder();
 
-            if (!response.ok) {
-                throw new Error(`Embedding generation failed: ${response.statusText}`);
+            const out = await embedder(text, { pooling: 'mean', normalize: true });
+
+            const embeddingArray: number[] | Float32Array = out?.data;
+            if (!embeddingArray || typeof (embeddingArray as any).length !== 'number') {
+                throw new Error('Invalid embedding output received from local model');
             }
 
-            const data = await response.json() as any;
-            const embedding = data.embedding;
-
-            if (!Array.isArray(embedding)) {
-                throw new Error('Invalid embedding format received');
-            }
-
-            // Convert embedding array to Buffer for storage
-            const embeddingBuffer = Buffer.from(new Float32Array(embedding).buffer);
+            const embeddingBuffer = Buffer.from(new Float32Array(embeddingArray as any).buffer);
 
             this.logger.info(`Embedding generated for text (${text.length} chars)`, {
                 model: this.embeddingModel,
-                dimensions: embedding.length
+                dimensions: (embeddingArray as any).length
             });
 
             return embeddingBuffer;
@@ -51,6 +38,17 @@ export class EmbeddingService {
             this.logger.error('Failed to generate embedding:', error);
             throw error;
         }
+    }
+
+    private async getLocalEmbedder(): Promise<any> {
+        if (!this.embedderPromise) {
+            this.embedderPromise = (async () => {
+                const mod: any = await import('@xenova/transformers');
+                const pipeline = mod.pipeline;
+                return pipeline('feature-extraction', this.embeddingModel);
+            })();
+        }
+        return this.embedderPromise;
     }
 
     async indexAgentMemory(
@@ -290,6 +288,7 @@ export class EmbeddingService {
 
     setEmbeddingModel(model: string): void {
         this.embeddingModel = model;
+        this.embedderPromise = null;
         this.logger.info(`Embedding model changed to: ${model}`);
     }
 

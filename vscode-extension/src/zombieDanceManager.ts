@@ -19,6 +19,13 @@ export class ZombieDanceManager {
         this.statusBarItem.show();
     }
 
+    private getAgentId(): number {
+        const config = vscode.workspace.getConfiguration('zombie-dance');
+        const raw = config.get<any>('agentId');
+        const parsed = typeof raw === 'number' ? raw : parseInt(String(raw || ''), 10);
+        return Number.isNaN(parsed) ? 1 : parsed;
+    }
+
     private getApiKey(): string {
         const config = vscode.workspace.getConfiguration('zombie-dance');
         return config.get<string>('apiKey') || '';
@@ -93,7 +100,8 @@ export class ZombieDanceManager {
     async mcpListTools(): Promise<void> {
         const config = vscode.workspace.getConfiguration('zombie-dance');
         const serverUrl = config.get<string>('serverUrl') || 'http://localhost:8000';
-        const url = serverUrl.replace(/\/$/, '') + '/mcp/tools';
+        const agentId = this.getAgentId();
+        const url = serverUrl.replace(/\/$/, '') + `/mcp/tools?agentId=${encodeURIComponent(String(agentId))}`;
 
         try {
             this.outputChannel.show(true);
@@ -125,7 +133,8 @@ export class ZombieDanceManager {
         const url = serverUrl.replace(/\/$/, '') + '/mcp/execute';
 
         try {
-            const listUrl = serverUrl.replace(/\/$/, '') + '/mcp/tools';
+            const agentId = this.getAgentId();
+            const listUrl = serverUrl.replace(/\/$/, '') + `/mcp/tools?agentId=${encodeURIComponent(String(agentId))}`;
             const data = await this.httpGetJson(listUrl);
             const tools = (data && data.tools) ? data.tools : [];
             const toolNames = Array.isArray(tools)
@@ -160,7 +169,7 @@ export class ZombieDanceManager {
 
             this.outputChannel.show(true);
             this.outputChannel.appendLine(`▶️ MCP execute: ${picked}`);
-            const res = await this.httpPostJson(url, { toolName: picked, input: parsed }, headers);
+            const res = await this.httpPostJson(url, { agentId, toolName: picked, input: parsed }, headers);
 
             this.outputChannel.appendLine('--- MCP Result ---');
             this.outputChannel.appendLine(typeof res === 'string' ? res : JSON.stringify(res, null, 2));

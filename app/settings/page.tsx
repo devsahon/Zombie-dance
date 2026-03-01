@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 
 interface EnvVariable {
   key: string
@@ -18,6 +19,22 @@ interface DefaultModelResponse {
   defaultModel?: string | null
 }
 
+interface ProviderListItem {
+  id: number
+  name: string
+  type?: string
+  status?: string
+}
+
+interface RuntimeSettingsResponse {
+  success?: boolean
+  runtime?: {
+    active_provider_id: number | null
+    prefer_streaming: boolean | null
+    model_request_timeout_ms: number | null
+  }
+}
+
 export default function SettingsPage() {
   const [envVars, setEnvVars] = useState<EnvVariable[]>([])
   const [showSecrets, setShowSecrets] = useState(false)
@@ -27,9 +44,16 @@ export default function SettingsPage() {
   const [defaultModel, setDefaultModel] = useState<string>("")
   const [savingDefaultModel, setSavingDefaultModel] = useState(false)
 
+  const [providers, setProviders] = useState<ProviderListItem[]>([])
+  const [activeProviderId, setActiveProviderId] = useState<string>("")
+  const [preferStreaming, setPreferStreaming] = useState(false)
+  const [requestTimeoutMs, setRequestTimeoutMs] = useState<string>("")
+  const [savingRuntime, setSavingRuntime] = useState(false)
+
   useEffect(() => {
     fetchEnvVars()
     fetchModelsAndDefaultModel()
+    fetchProvidersAndRuntime()
   }, [])
 
   const fetchEnvVars = async () => {
@@ -44,6 +68,74 @@ export default function SettingsPage() {
       console.log("[v0] Failed to fetch env vars:", error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchProvidersAndRuntime = async () => {
+    try {
+      const [providersRes, runtimeRes] = await Promise.all([
+        fetch("/api/proxy/providers"),
+        fetch("/api/proxy/settings/runtime"),
+      ])
+
+      if (providersRes.ok) {
+        const data = await providersRes.json()
+        const list = Array.isArray(data?.providers) ? data.providers : []
+        const mapped: ProviderListItem[] = list
+          .map((p: any) => ({
+            id: Number(p?.id),
+            name: String(p?.name || ""),
+            type: typeof p?.type === "string" ? p.type : undefined,
+            status: typeof p?.status === "string" ? p.status : undefined,
+          }))
+          .filter((p: ProviderListItem) => Boolean(p.id) && Boolean(p.name))
+        setProviders(mapped)
+      }
+
+      if (runtimeRes.ok) {
+        const d = (await runtimeRes.json()) as RuntimeSettingsResponse
+        const rid = d?.runtime?.active_provider_id
+        setActiveProviderId(typeof rid === "number" ? String(rid) : "__default__")
+
+        const ps = d?.runtime?.prefer_streaming
+        setPreferStreaming(Boolean(ps))
+
+        const t = d?.runtime?.model_request_timeout_ms
+        setRequestTimeoutMs(typeof t === "number" ? String(t) : "")
+      }
+    } catch (error) {
+      console.log("[v0] Failed to fetch providers/runtime:", error)
+    }
+  }
+
+  const handleSaveRuntime = async () => {
+    setSavingRuntime(true)
+    try {
+      const payload: any = {
+        prefer_streaming: Boolean(preferStreaming),
+      }
+
+      if (activeProviderId.trim() && activeProviderId !== "__default__") {
+        payload.active_provider_id = parseInt(activeProviderId, 10)
+      }
+
+      if (requestTimeoutMs.trim()) {
+        payload.model_request_timeout_ms = parseInt(requestTimeoutMs, 10)
+      }
+
+      const res = await fetch("/api/proxy/settings/runtime", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      if (res.ok) {
+        await fetchProvidersAndRuntime()
+      }
+    } catch (error) {
+      console.log("[v0] Failed to save runtime settings:", error)
+    } finally {
+      setSavingRuntime(false)
     }
   }
 
@@ -142,6 +234,60 @@ export default function SettingsPage() {
               <div className="flex justify-end">
                 <Button onClick={handleSaveDefaultModel} disabled={!defaultModel.trim() || savingDefaultModel}>
                   {savingDefaultModel ? "Saving..." : "Save"}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-6 rounded-lg border border-border bg-card p-6">
+            <div className="mb-4">
+              <h3 className="font-medium">Runtime Provider</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Select the active provider for runtime generation (agents/chat). This is DB-backed via system_settings.
+              </p>
+            </div>
+
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label>Active Provider</Label>
+                <Select value={activeProviderId} onValueChange={setActiveProviderId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select provider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__default__">(Use default / env provider)</SelectItem>
+                    {providers.map((p) => (
+                      <SelectItem key={p.id} value={String(p.id)}>
+                        {p.name}{p.type ? ` (${p.type})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Model request timeout (ms)</Label>
+                <Input
+                  value={requestTimeoutMs}
+                  onChange={(e) => setRequestTimeoutMs(e.target.value)}
+                  placeholder="e.g. 180000"
+                  className="font-mono text-sm"
+                />
+              </div>
+
+              <div className="flex items-center justify-between rounded-md border border-border p-3">
+                <div>
+                  <div className="text-sm font-medium">Prefer streaming</div>
+                  <div className="text-xs text-muted-foreground">
+                    If enabled, server will prefer streaming for Ollama-style providers to reduce hard timeouts.
+                  </div>
+                </div>
+                <Switch checked={preferStreaming} onCheckedChange={setPreferStreaming} />
+              </div>
+
+              <div className="flex justify-end">
+                <Button onClick={handleSaveRuntime} disabled={savingRuntime}>
+                  {savingRuntime ? "Saving..." : "Save"}
                 </Button>
               </div>
             </div>

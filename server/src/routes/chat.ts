@@ -1,10 +1,12 @@
 import express, { Request, Response } from 'express';
 import { OllamaService, ChatMessage } from '../services/ollama';
+import { ProviderGateway } from '../services/providerGateway';
 import { Logger } from '../utils/logger';
 import { executeQuery } from '../database/connection';
 
 const router = express.Router();
 const ollamaService = new OllamaService();
+const providerGateway = new ProviderGateway();
 const logger = new Logger();
 
 // Chat endpoint
@@ -32,7 +34,7 @@ router.post('/message', async (req, res) => {
                         ORDER BY created_at ASC
                     `;
                     const history: any[] = await executeQuery(query, [conversation_id]);
-                    
+
                     for (const msg of history) {
                         messages.push({
                             role: msg.role === 'user' ? 'user' : 'assistant',
@@ -52,13 +54,13 @@ router.post('/message', async (req, res) => {
         });
 
         // Generate response
-        const response = await ollamaService.chat(messages, model);
+        const response = await providerGateway.chat(messages, model);
 
         // Save the conversation if database is available
         if ((global as any).connection) {
             try {
                 let convId = conversation_id;
-                
+
                 // Create conversation if it doesn't exist
                 if (!convId) {
                     const convQuery = `
@@ -103,7 +105,7 @@ router.post('/message', async (req, res) => {
         res.json({
             success: true,
             response: response,
-            conversationId: conversation_id || ((global as any).connection ? 'new_conversation_id_placeholder' : undefined),
+            conversationId: conversation_id,
             model: model || process.env.OLLAMA_DEFAULT_MODEL,
             timestamp: new Date().toISOString(),
             conversation: {
@@ -237,7 +239,7 @@ router.post('/generate', async (req, res) => {
             });
         }
 
-        const response = await ollamaService.generate(prompt, model);
+        const response = await providerGateway.generate(prompt, model);
         res.json({
             success: true,
             prompt: prompt,
@@ -261,64 +263,42 @@ router.post('/generate', async (req, res) => {
 // Get chat history (mock implementation)
 router.get('/history', async (req, res) => {
     try {
-        // If database is available, fetch from database
-        if ((global as any).connection) {
-            try {
-                const { conversationId } = req.query;
-                let query = '';
-                let params: any[] = [];
-
-                if (conversationId) {
-                    // Get messages for specific conversation
-                    query = `
-                        SELECT m.id, m.conversation_id, m.sender_type as role, m.content, m.created_at
-                        FROM messages m
-                        WHERE m.conversation_id = ?
-                        ORDER BY m.created_at ASC
-                    `;
-                    params = [conversationId];
-                } else {
-                    // Get recent conversations
-                    query = `
-                        SELECT c.id as conversationId, c.title, c.status, c.created_at, c.updated_at,
-                               (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) as messageCount
-                        FROM conversations c
-                        ORDER BY c.updated_at DESC
-                        LIMIT 20
-                    `;
-                }
-
-                const results = await executeQuery(query, params);
-                
-                res.json({
-                    success: true,
-                    data: results,
-                    timestamp: new Date().toISOString()
-                });
-            } catch (err) {
-                logger.error('Database error in chat history:', err);
-                // Fall back to mock data
-                throw err;
-            }
-        } else {
-            // In a real implementation, this would fetch from a database
-            const mockHistory = [
-                {
-                    id: '1',
-                    timestamp: new Date(Date.now() - 3600000).toISOString(),
-                    messages: [
-                        { role: 'user', content: 'Hello, how are you?' },
-                        { role: 'assistant', content: 'I am doing well, thank you for asking!' }
-                    ]
-                }
-            ];
-
-            res.json({
-                success: true,
-                conversations: mockHistory,
-                timestamp: new Date().toISOString()
+        if (!(global as any).connection) {
+            return res.status(503).json({
+                success: false,
+                error: 'Database not available',
+                message: 'Chat history requires a database connection'
             });
         }
+
+        const { conversationId } = req.query;
+        let query = '';
+        let params: any[] = [];
+
+        if (conversationId) {
+            query = `
+                SELECT sender_type as role, content, created_at
+                FROM messages
+                WHERE conversation_id = ?
+                ORDER BY created_at ASC
+            `;
+            params = [conversationId];
+        } else {
+            query = `
+                SELECT c.id as conversationId, c.title, c.created_at, c.updated_at,
+                       (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) as messageCount
+                FROM conversations c
+                ORDER BY c.updated_at DESC
+                LIMIT 20
+            `;
+        }
+
+        const results = await executeQuery(query, params);
+        res.json({
+            success: true,
+            data: results,
+            timestamp: new Date().toISOString()
+        });
     } catch (error) {
         logger.error('Get chat history error:', error);
 
@@ -334,71 +314,34 @@ router.get('/history', async (req, res) => {
 // Get all conversations (NEW endpoint)
 router.get('/conversations', async (req, res) => {
     try {
-        // If database is available, fetch from database
-        if ((global as any).connection) {
-            try {
-                const query = `
-                    SELECT 
-                        c.id,
-                        c.title,
-                        c.status,
-                        c.created_at,
-                        c.updated_at,
-                        COUNT(m.id) as message_count
-                    FROM conversations c
-                    LEFT JOIN messages m ON c.id = m.conversation_id
-                    GROUP BY c.id, c.title, c.status, c.created_at, c.updated_at
-                    ORDER BY c.updated_at DESC
-                `;
-                const results = await executeQuery(query);
-                
-                res.json({
-                    success: true,
-                    data: results,
-                    count: results.length,
-                    timestamp: new Date().toISOString()
-                });
-            } catch (err) {
-                logger.error('Database error in conversations:', err);
-                // Fall back to mock data
-                throw err;
-            }
-        } else {
-            // Fallback to mock data when running in offline mode
-            const mockConversations = [
-                {
-                    id: 1,
-                    title: 'Initial Conversation',
-                    status: 'active',
-                    created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-                    updated_at: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-                    message_count: 5
-                },
-                {
-                    id: 2,
-                    title: 'Project Discussion',
-                    status: 'active',
-                    created_at: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
-                    updated_at: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
-                    message_count: 12
-                },
-                {
-                    id: 3,
-                    title: 'Technical Support',
-                    status: 'closed',
-                    created_at: new Date(Date.now() - 259200000).toISOString(), // 3 days ago
-                    updated_at: new Date(Date.now() - 259200000).toISOString(), // 3 days ago
-                    message_count: 8
-                }
-            ];
-
-            res.json({
-                success: true,
-                data: mockConversations,
-                count: mockConversations.length,
-                timestamp: new Date().toISOString()
+        if (!(global as any).connection) {
+            return res.status(503).json({
+                success: false,
+                error: 'Database not available',
+                message: 'Conversations require a database connection'
             });
         }
+
+        const query = `
+            SELECT 
+                c.id,
+                c.title,
+                c.created_at,
+                c.updated_at,
+                COUNT(m.id) as message_count
+            FROM conversations c
+            LEFT JOIN messages m ON c.id = m.conversation_id
+            GROUP BY c.id, c.title, c.created_at, c.updated_at
+            ORDER BY c.updated_at DESC
+        `;
+        const results = await executeQuery(query);
+
+        res.json({
+            success: true,
+            data: results,
+            count: results.length,
+            timestamp: new Date().toISOString()
+        });
     } catch (error) {
         logger.error('Get conversations error:', error);
 
@@ -417,101 +360,56 @@ router.get('/conversations/:id', async (req, res) => {
     try {
         const { id } = req.params;
 
-        // If database is available, fetch from database
-        if ((global as any).connection) {
-            try {
-                const query = `
-                    SELECT 
-                        c.id,
-                        c.title,
-                        c.status,
-                        c.created_at,
-                        c.updated_at,
-                        m.id as message_id,
-                        m.sender_type as role,
-                        m.content,
-                        m.created_at as message_created_at
-                    FROM conversations c
-                    LEFT JOIN messages m ON c.id = m.conversation_id
-                    WHERE c.id = ?
-                    ORDER BY m.created_at ASC
-                `;
-                const results: any[] = await executeQuery(query, [id]);
-
-                if (results.length === 0) {
-                    return res.status(404).json({
-                        success: false,
-                        error: 'Conversation not found'
-                    });
-                }
-
-                // Extract conversation info from the first row
-                const conversation = {
-                    id: results[0].id,
-                    title: results[0].title,
-                    status: results[0].status,
-                    created_at: results[0].created_at,
-                    updated_at: results[0].updated_at,
-                    messages: results.filter(r => r.message_id).map(r => ({
-                        id: r.message_id,
-                        role: r.role,
-                        content: r.content,
-                        created_at: r.message_created_at
-                    }))
-                };
-
-                res.json({
-                    success: true,
-                    data: conversation,
-                    timestamp: new Date().toISOString()
-                });
-            } catch (err) {
-                logger.error('Database error in specific conversation:', err);
-                // Fall back to mock data
-                throw err;
-            }
-        } else {
-            // Fallback to mock data when running in offline mode
-            const mockConversation = {
-                id,
-                title: `Conversation ${id}`,
-                status: 'active',
-                created_at: new Date(Date.now() - 3600000).toISOString(),
-                updated_at: new Date().toISOString(),
-                messages: [
-                    {
-                        id: 1,
-                        role: 'user',
-                        content: 'Hello, can you help me with something?',
-                        created_at: new Date(Date.now() - 300000).toISOString() // 5 minutes ago
-                    },
-                    {
-                        id: 2,
-                        role: 'assistant',
-                        content: 'Of course! What do you need help with?',
-                        created_at: new Date(Date.now() - 240000).toISOString() // 4 minutes ago
-                    },
-                    {
-                        id: 3,
-                        role: 'user',
-                        content: 'I need to understand how this system works.',
-                        created_at: new Date(Date.now() - 180000).toISOString() // 3 minutes ago
-                    },
-                    {
-                        id: 4,
-                        role: 'assistant',
-                        content: 'This system provides AI assistance through various integrations and tools.',
-                        created_at: new Date(Date.now() - 120000).toISOString() // 2 minutes ago
-                    }
-                ]
-            };
-
-            res.json({
-                success: true,
-                data: mockConversation,
-                timestamp: new Date().toISOString()
+        if (!(global as any).connection) {
+            return res.status(503).json({
+                success: false,
+                error: 'Database not available',
+                message: 'Conversation details require a database connection'
             });
         }
+
+        const query = `
+            SELECT 
+                c.id,
+                c.title,
+                c.created_at,
+                c.updated_at,
+                m.id as message_id,
+                m.sender_type as role,
+                m.content,
+                m.created_at as message_created_at
+            FROM conversations c
+            LEFT JOIN messages m ON c.id = m.conversation_id
+            WHERE c.id = ?
+            ORDER BY m.created_at ASC
+        `;
+        const results: any[] = await executeQuery(query, [id]);
+
+        if (results.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Conversation not found'
+            });
+        }
+
+        const conversation = {
+            id: results[0].id,
+            title: results[0].title,
+            created_at: results[0].created_at,
+            updated_at: results[0].updated_at,
+            messages: results.filter(r => r.message_id).map(r => ({
+                id: r.message_id,
+                role: r.role,
+                content: r.content,
+                created_at: r.message_created_at
+            }))
+        };
+
+        res.json({
+            success: true,
+            data: conversation,
+            timestamp: new Date().toISOString()
+        });
     } catch (error) {
         logger.error('Get specific conversation error:', error);
 

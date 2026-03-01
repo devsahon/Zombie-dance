@@ -4,13 +4,21 @@ import dotenv from 'dotenv';
 // Load environment variables
 dotenv.config({ path: '.env' });
 
+function requireEnv(name: string): string {
+  const v = (process.env[name] || '').trim();
+  if (!v) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return v;
+}
+
 async function populateAgents() {
   try {
     // Initialize database connection using environment variables
     const config = {
       host: process.env.DB_HOST || 'localhost',
-      user: process.env.DB_USER || 'u-root',
-      password: process.env.DB_PASSWORD || 'p-105585',
+      user: requireEnv('DB_USER'),
+      password: requireEnv('DB_PASSWORD'),
       database: process.env.DB_NAME || 'uas_admin',
       waitForConnections: true,
       connectionLimit: 10,
@@ -112,20 +120,22 @@ async function populateAgents() {
 
     // Insert agents into database
     for (const agent of agents) {
-      const result = await executeQuery(
-        `INSERT INTO agents (name, type, persona_name, description, status, config, metadata) 
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [
-          agent.name,
-          agent.type,
-          agent.persona_name,
-          agent.description,
-          agent.status,
-          agent.config,
-          agent.metadata
-        ]
+      const result: any = await executeQuery(
+        `INSERT INTO agents (name, type, persona_name, description, status, config, metadata)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           type = VALUES(type),
+           persona_name = VALUES(persona_name),
+           description = VALUES(description),
+           status = VALUES(status),
+           config = VALUES(config),
+           metadata = VALUES(metadata),
+           updated_at = CURRENT_TIMESTAMP`,
+        [agent.name, agent.type, agent.persona_name, agent.description, agent.status, agent.config, agent.metadata]
       );
-      console.log(`Created agent: ${agent.name} (ID: ${(result as any).insertId})`);
+
+      const id = result?.insertId || null;
+      console.log(`Upserted agent: ${agent.name}${id ? ` (ID: ${id})` : ''}`);
     }
 
     console.log('All agents created successfully!');

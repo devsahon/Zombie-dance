@@ -18,75 +18,35 @@ export async function GET() {
     })
 
     if (!response.ok) {
-      console.error("[v0] Models API error:", response.status, response.statusText)
-      // Return fallback data for development
-      return NextResponse.json({
-        success: true,
-        data: [
-          {
-            id: 1,
-            name: "qwen2.5-coder:1.5b",
-            model_name: "qwen2.5-coder:1.5b",
-            model_version: "1.5b",
-            status: "running",
-            provider_name: "Ollama",
-            provider_type: "local",
-            size: 900000000,
-            details: {
-              format: "gguf",
-              family: "qwen2.5",
-              parameterSize: "1.5B",
-              quantizationLevel: "Q4_K_M"
-            },
-            modified: new Date().toISOString()
-          },
-          {
-            id: 2,
-            name: "llama3.1:latest",
-            model_name: "llama3.1:latest",
-            model_version: "latest",
-            status: "running",
-            provider_name: "Ollama",
-            provider_type: "local",
-            size: 4700000000,
-            details: {
-              format: "gguf",
-              family: "llama",
-              parameterSize: "8B",
-              quantizationLevel: "Q4_K_M"
-            },
-            modified: new Date().toISOString()
-          }
-        ]
-      })
+      const text = await response.text()
+      let payload: any = null
+      try {
+        payload = text ? JSON.parse(text) : null
+      } catch {
+        payload = null
+      }
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: payload?.error || "Failed to fetch models",
+          message: payload?.message || response.statusText,
+        },
+        { status: response.status },
+      )
     }
 
     const data = await response.json()
     return NextResponse.json(data)
   } catch (error) {
     console.error("[v0] Models fetch error:", error)
-    // Return fallback data
-    return NextResponse.json({
-      success: true,
-      data: [
-        {
-          id: 1,
-          name: "qwen2.5-coder:1.5b",
-          model_name: "qwen2.5-coder:1.5b",
-          model_version: "1.5b",
-          status: "running",
-          provider_name: "Ollama",
-          provider_type: "local",
-          size: 900000000,
-          details: {
-            format: "gguf",
-            family: "qwen2.5",
-            parameterSize: "1.5B",
-            quantizationLevel: "Q4_K_M"
-          },
-          modified: new Date().toISOString()
-        }
-      ]
-    })
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Internal server error",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
   }
 }
